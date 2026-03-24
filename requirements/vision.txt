@@ -1,0 +1,20 @@
+# requirements/vision.txt
+# Vision / multimodal model dependencies.
+# Extends base.txt — install with:  pip install -r requirements/vision.txt
+
+-r base.txt
+
+torch
+torchaudio
+torchvision
+transformers
+timm
+einops
+flash_attn
+sentencepiece
+safetensors
+accelerate
+peft
+decord
+av
+qwen-vl-utils

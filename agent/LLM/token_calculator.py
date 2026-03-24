@@ -25,9 +25,17 @@ def calculation_of_token(
         return 0
 
     try:
-        encoding = tiktoken.encoding_for_model(model)
+        # Handle special model names that tiktoken doesn't recognize
+        if "computer-use-preview" in model or "operator" in model:
+            # Computer-use-preview models use the same encoding as GPT-4
+            encoding = tiktoken.encoding_for_model("gpt-4")
+        elif "gpt-4.1" in model:
+            # GPT-4.1 uses the same encoding as GPT-4
+            encoding = tiktoken.encoding_for_model("gpt-4")
+        else:
+            encoding = tiktoken.encoding_for_model(model)
     except KeyError:
-        print("Warning: Model not found. Using default encoding.")
+        print(f"Warning: Model '{model}' not found in tiktoken. Using default encoding.")
         encoding = tiktoken.get_encoding("cl100k_base")
 
     current_tokens = 0
@@ -46,9 +54,55 @@ def calculation_of_token(
         if isinstance(content, list):
             # Process list of prompt elements
             for element in content:
-                if 'text' in element.get('type', ''):
+                element_type = element.get('type', '')
+                if 'text' in element_type:
                     tokens = encoding.encode(element['text'])
                     current_tokens += len(tokens)
+                elif 'image' in element_type or element_type == 'image_url':
+                    # Calculate image tokens based on OpenAI's official vision model pricing
+                    # Formula: 85 base tokens + 170 * (number of 512x512 tiles)
+                    image_url = element.get('image_url', {})
+                    if isinstance(image_url, dict):
+                        detail = image_url.get('detail', 'auto')
+                        if detail == 'low':
+                            current_tokens += 85
+                            print(f"📸 Image tokens calculated (low detail): 85")
+                        else:
+                            # High detail calculation using official OpenAI method
+                            # Assume typical screenshot dimensions (1280x720)
+                            width, height = 1280, 720
+                            
+                            # Step 1: Scale down to fit within 2048x2048 if necessary
+                            if width > 2048 or height > 2048:
+                                aspect_ratio = width / height
+                                if aspect_ratio > 1:
+                                    width = 2048
+                                    height = int(2048 / aspect_ratio)
+                                else:
+                                    height = 2048
+                                    width = int(2048 * aspect_ratio)
+                            
+                            # Step 2: Scale so shortest side is 768px if both dimensions > 768
+                            if width > 768 and height > 768:
+                                aspect_ratio = width / height
+                                if aspect_ratio > 1:
+                                    height = 768
+                                    width = int(768 * aspect_ratio)
+                                else:
+                                    width = 768
+                                    height = int(768 / aspect_ratio)
+                            
+                            # Step 3: Calculate tiles (512x512 each)
+                            tiles_width = -(-width // 512)  # Ceiling division
+                            tiles_height = -(-height // 512)
+                            image_tokens = 85 + 170 * (tiles_width * tiles_height)
+                            
+                            current_tokens += image_tokens
+                            print(f"📸 Image tokens calculated (high detail): {image_tokens} (tiles: {tiles_width}x{tiles_height})")
+                    else:
+                        # Fallback for direct base64 images - use conservative estimate
+                        current_tokens += 765  # Typical for 1280x720 screenshots
+                        print(f"📸 Image tokens calculated (fallback): 765")
         else:
             # Process direct text content
             tokens = encoding.encode(content)

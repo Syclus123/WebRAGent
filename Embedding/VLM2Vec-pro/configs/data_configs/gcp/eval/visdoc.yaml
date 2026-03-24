@@ -1,0 +1,79 @@
+ViDoRe_arxivqa:
+    dataset_parser: "vidore"
+    dataset_name: "ViDoRe_arxivqa"
+    image_root: "/data/ziyan/VisDoc/vidore"
+    num_sample_per_subset: None
+    eval_type: global
+    metrics: ["precision", "recall", "ndcg"]
+
+ViDoRe_docvqa:
+    dataset_parser: "vidore"
+    dataset_name: "ViDoRe_docvqa"
+    image_root: "/data/ziyan/VisDoc/vidore/docvqa"
+    num_sample_per_subset: None
+    eval_type: global
+    metrics: ["precision", "recall", "ndcg"]
+
+ViDoRe_infovqa:
+    dataset_parser: "vidore"
+    dataset_name: "ViDoRe_infovqa"
+    image_root: "/data/ziyan/VisDoc/vidore/infovqa"
+    num_sample_per_subset: None
+    eval_type: global
+    metrics: ["precision", "recall", "ndcg"]
+
+ViDoRe_tabfquad:
+    dataset_parser: "vidore"
+    dataset_name: "ViDoRe_tabfquad"
+    image_root: "/data/ziyan/VisDoc/vidore/tabfquad"
+    num_sample_per_subset: None
+    eval_type: global
+    metrics: ["precision", "recall", "ndcg"]
+
+ViDoRe_tatdqa:
+    dataset_parser: "vidore"
+    dataset_name: "ViDoRe_tatdqa"
+    image_root: "/data/ziyan/VisDoc/vidore/tatdqa"
+    num_sample_per_subset: None
+    eval_type: global
+    metrics: ["precision", "recall", "ndcg"]
+
+ViDoRe_shiftproject:
+    dataset_parser: "vidore"
+    dataset_name: "ViDoRe_shiftproject"
+    image_root: "/data/ziyan/VisDoc/vidore/shiftproject"
+    num_sample_per_subset: None
+    eval_type: global
+    metrics: ["precision", "recall", "ndcg"]
+
+ViDoRe_syntheticDocQA_artificial_intelligence:
+    dataset_parser: "vidore"
+    dataset_name: "ViDoRe_syntheticDocQA_artificial_intelligence"
+    image_root: "/data/ziyan/VisDoc/vidore/syntheticDocQA_artificial_intelligence"
+    num_sample_per_subset: None
+    eval_type: global
+    metrics: ["precision", "recall", "ndcg"]
+
+ViDoRe_syntheticDocQA_energy:
+    dataset_parser: "vidore"
+    dataset_name: "ViDoRe_syntheticDocQA_energy"
+    image_root: "/data/ziyan/VisDoc/vidore/syntheticDocQA_energy"
+    num_sample_per_subset: None
+    eval_type: global
+    metrics: ["precision", "recall", "ndcg"]
+
+ViDoRe_syntheticDocQA_government_reports:
+    dataset_parser: "vidore"
+    dataset_name: "ViDoRe_syntheticDocQA_government_reports"
+    image_root: "/data/ziyan/VisDoc/vidore/syntheticDocQA_government_reports"
+    num_sample_per_subset: None
+    eval_type: global
+    metrics: ["precision", "recall", "ndcg"]
+
+ViDoRe_syntheticDocQA_healthcare_industry:
+    dataset_parser: "vidore"
+    dataset_name: "ViDoRe_syntheticDocQA_healthcare_industry"
+    image_root: "/data/ziyan/VisDoc/vidore/syntheticDocQA_healthcare_industry"
+    num_sample_per_subset: None
+    eval_type: global
+    metrics: ["precision", "recall", "ndcg"]

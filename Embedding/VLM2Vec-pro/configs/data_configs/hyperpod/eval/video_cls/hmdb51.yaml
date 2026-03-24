@@ -1,0 +1,10 @@
+HMDB51:
+    dataset_parser: "video_classification"
+    dataset_name: "hmdb51"
+    dataset_split: "test"
+    data_path: "/fsx/home/ruimeng/data/MMEB_Pro/data/hmdb51.jsonl"
+    video_dir: ""
+    frame_dir: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_cls/HMDB51"
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]

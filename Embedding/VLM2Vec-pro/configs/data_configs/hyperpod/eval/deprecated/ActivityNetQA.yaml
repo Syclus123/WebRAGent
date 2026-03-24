@@ -1,0 +1,9 @@
+ActivityNetQA:
+    dataset_parser: activitynetqa
+    data_path: /fsx/home/ruimeng/data/MMEB_Pro/data/activitynetqa.jsonl
+    video_dir: /fsx/home/ruimeng/data/lmms-lab/ActivityNetQA/all_test/
+    frame_dir: /fsx/home/ruimeng/data/MMEB_Pro/frames/video_qa/ActivityNetQA/
+    video_export_dir: /fsx/home/ruimeng/data/MMEB_Pro/frames/video_qa/ActivityNetQA
+    source: https://huggingface.co/datasets/lmms-lab/ActivityNetQA/
+    max_frames_saved: 64
+    num_frames: 8

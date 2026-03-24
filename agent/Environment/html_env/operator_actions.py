@@ -24,6 +24,7 @@ class OperatorActionType(str, Enum):
     DRAG = "drag"
     SCREENSHOT = "screenshot"
     WAIT = "wait"
+    GET_FINAL_ANSWER = "get_final_answer"
 
 
 @dataclass
@@ -38,6 +39,7 @@ class OperatorAction:
     scroll_y: Optional[int] = None
     path: Optional[list[list[int]]] = None
     ms: Optional[int] = None
+    button: Optional[str] = None  # add button field support (left, right, middle)
     
     def to_dict(self) -> Dict[str, Any]:
         action_dict = {"type": self.type.value}
@@ -58,6 +60,8 @@ class OperatorAction:
             action_dict["path"] = self.path
         if self.ms is not None:
             action_dict["ms"] = self.ms
+        if self.button is not None:
+            action_dict["button"] = self.button
             
         return action_dict
 
@@ -66,15 +70,15 @@ class OperatorActionFactory:
     """Create OpenAI Operator Action factory class"""
     @staticmethod
     @beartype
-    def create_click_action(x: int, y: int) -> OperatorAction:
-        """创建点击操作"""
-        return OperatorAction(type=OperatorActionType.CLICK, x=x, y=y)
+    def create_click_action(x: int, y: int, button: str = "left") -> OperatorAction:
+        """创建点击操作，支持不同button类型"""
+        return OperatorAction(type=OperatorActionType.CLICK, x=x, y=y, button=button)
     
     @staticmethod
     @beartype
-    def create_double_click_action(x: int, y: int) -> OperatorAction:
-        """创建双击操作"""
-        return OperatorAction(type=OperatorActionType.DOUBLE_CLICK, x=x, y=y)
+    def create_double_click_action(x: int, y: int, button: str = "left") -> OperatorAction:
+        """创建双击操作，支持不同button类型"""
+        return OperatorAction(type=OperatorActionType.DOUBLE_CLICK, x=x, y=y, button=button)
     
     @staticmethod
     @beartype
@@ -111,6 +115,12 @@ class OperatorActionFactory:
     def create_wait_action(ms: int = 1000) -> OperatorAction:
         """创建等待操作"""
         return OperatorAction(type=OperatorActionType.WAIT, ms=ms)
+
+    @staticmethod
+    @beartype
+    def create_get_final_answer_action(answer: str = "") -> OperatorAction:
+        """创建任务完成操作"""
+        return OperatorAction(type=OperatorActionType.GET_FINAL_ANSWER, text=answer)
 
 
 class OperatorActionExecutor:
@@ -174,6 +184,10 @@ class OperatorActionExecutor:
             wait_time = action_dict.get("ms", 1000) / 1000
             await asyncio.sleep(wait_time)
         elif action_type == "screenshot":
+            pass
+        elif action_type == "get_final_answer":
+            # Task completion - no action needed, just log
+            logger.info(f"🎯 Task completed with answer: {action_dict.get('text', '')}")
             pass
         
         # 对于大多数操作，等待网络空闲
@@ -240,5 +254,7 @@ class OperatorResponseParser:
             return OperatorActionFactory.create_wait_action(action_dict.get("ms", 1000))
         elif action_type == "screenshot":
             return OperatorActionFactory.create_screenshot_action()
+        elif action_type == "get_final_answer":
+            return OperatorActionFactory.create_get_final_answer_action(action_dict.get("text", ""))
         
         return None 

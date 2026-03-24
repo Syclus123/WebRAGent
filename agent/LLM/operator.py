@@ -74,10 +74,17 @@ class OperatorGenerator:
             })
             
             # Extract call_id from response for next iteration
+            call_id_found = False
             for item in response.output:
                 if isinstance(item, ResponseComputerToolCall):
                     self.last_call_id = item.call_id
+                    call_id_found = True
+                    logger.debug(f"📞 Extracted call_id for next iteration: {item.call_id}")
                     break
+            
+            if not call_id_found:
+                logger.debug("🔄 No computer tool call found in response - conversation may reset on next iteration")
+                # Don't set last_call_id to None here, keep it for potential reuse
             
             # Update previous response ID for continuity
             self.previous_response_id = response.id
@@ -126,9 +133,20 @@ class OperatorGenerator:
                     break
             
             if not system_message:
-                system_message = """You are OpenAI Operator, an AI agent specialized in browser automation.
-                
-Your primary objective is to complete web-based tasks efficiently and accurately by analyzing screenshots and providing specific actions.
+                system_message = """You are OpenAI Operator, an AUTONOMOUS AI agent specialized in browser automation.
+
+🤖 **AUTONOMOUS MODE**: You have full authority to complete tasks independently. DO NOT ask for confirmation, permission, or approval from users.
+
+## CRITICAL EXECUTION RULES:
+❌ **FORBIDDEN BEHAVIORS**:
+- Never ask "Would you like me to..." or "Should I..." or "Do you want me to..."
+- Never seek confirmation before taking actions
+- Never explain why you need permission - you don't need it!
+
+✅ **REQUIRED BEHAVIORS**:
+- When you identify the correct element (product, button, link), interact with it IMMEDIATELY
+- Execute actions directly without asking for approval
+- Take the most logical action to progress toward task completion
 
 You can perform the following actions:
 - click: Click on buttons, links, or interactive elements at specific coordinates
@@ -137,9 +155,9 @@ You can perform the following actions:
 - scroll: Scroll the page up/down or left/right
 - keypress: Press specific keys (Enter, Escape, etc.)
 - drag: Drag from one point to another
-- wait: Wait for a specified time
+- wait: Wait ONLY when page is loading (max 2-3 seconds)
 
-When you analyze the screenshot, provide the most appropriate action to complete the user's task."""
+When you analyze the screenshot, IMMEDIATELY execute the most appropriate action to complete the user's task. Do not ask for permission - you are autonomous!"""
             
             # Add system message using correct format
             formatted_messages.append({
@@ -195,9 +213,16 @@ When you analyze the screenshot, provide the most appropriate action to complete
                     }
                 ]
             else:
-                # Fallback if no call_id available - should not happen in normal flow
-                logger.warning("No call_id available for subsequent conversation")
-                return []
+                # Fallback: Reset conversation and start fresh if no call_id
+                logger.warning("No call_id available for subsequent conversation - resetting to fresh conversation")
+                logger.info("This can happen if the previous response didn't contain a computer tool call")
+                
+                # Reset conversation state to start fresh
+                self.previous_response_id = None
+                self.last_call_id = None
+                
+                # Use first conversation format as fallback
+                return self._format_messages_for_responses_api(messages, screenshot_base64)
     
     def _process_operator_response(self, response) -> str:
         """
@@ -322,10 +347,17 @@ When you analyze the screenshot, provide the most appropriate action to complete
             })
             
             # Extract call_id from response for next iteration
+            call_id_found = False
             for item in response.output:
                 if isinstance(item, ResponseComputerToolCall):
                     self.last_call_id = item.call_id
+                    call_id_found = True
+                    logger.debug(f"📞 Extracted call_id for next iteration: {item.call_id}")
                     break
+            
+            if not call_id_found:
+                logger.debug("🔄 No computer tool call found in response - conversation may reset on next iteration")
+                # Don't set last_call_id to None here, keep it for potential reuse
             
             self.previous_response_id = response.id
             

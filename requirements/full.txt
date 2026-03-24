@@ -1,0 +1,6 @@
+# requirements/full.txt
+# Full installation: base + vision extras.
+# Install with:  pip install -r requirements/full.txt
+
+-r base.txt
+-r vision.txt

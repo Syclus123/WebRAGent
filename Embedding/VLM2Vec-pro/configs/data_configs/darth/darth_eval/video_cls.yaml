@@ -1,0 +1,54 @@
+SmthSmthV2:
+    dataset_parser: "ssv2"
+    dataset_name: "SmthSmthV2"
+    video_root: ""
+    frame_root: "/home/mingyi/sampled_video_frames/SSv2"
+    num_sample_per_subset: 1000
+    max_frames_saved: 64
+    num_frames: 8
+    eval_type: "local"
+    metrics: ["precision", "recall", "ndcg"]
+
+HMDB51:
+    dataset_parser: "video_classification"
+    dataset_name: "HMDB51"
+    video_root: ""
+    frame_root: "/home/mingyi/sampled_video_frames/HMDB51"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    eval_type: "global"
+    metrics: ["precision", "recall", "ndcg"]
+
+UCF101:
+    dataset_parser: "video_classification"
+    dataset_name: "UCF101"
+    video_root: ""
+    frame_dir: "/home/mingyi/sampled_video_frames/UCF101"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    eval_type: "global"
+    metrics: ["precision", "recall", "ndcg"]
+
+K700:
+    dataset_parser: "video_classification"
+    dataset_name: "Kinetics-700"
+    video_root: ""
+    frame_root: "/home/mingyi/sampled_video_frames/K700"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    eval_type: "global"
+    metrics: ["precision", "recall", "ndcg"]
+
+Breakfast:
+    dataset_parser: "video_classification"
+    dataset_name: "Breakfast"
+    video_root: ""
+    frame_root: "/home/mingyi/sampled_video_frames/Breakfast"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    eval_type: "global"
+    metrics: ["precision", "recall", "ndcg"]

@@ -51,30 +51,38 @@ def read_json_file(file_path):
 
 
 def save_screenshot(mode: str, record_time: str, task_name: str, step_number: int, description: str,
-                    screenshot_base64: str, task_name_id: str = None, task_uuid: str = None):# add task_uuid
+                    screenshot_base64: str, task_name_id: str = None, task_uuid: str = None, file_path: str = None):# add task_uuid and file_path
     # Prior use task_uuid,else task_name_id
     identifier = task_uuid if task_uuid is not None else task_name_id
     
-    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    # timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    
     invalid_chars = '<>:"/\\|?*'
     for char in invalid_chars:
         task_name = task_name.replace(char, '_')
-    # if task_name_id is None:
-    #     task_folder = f'results/screenshots/screenshots_{mode}_{record_time}/{task_name}'
-    # else:
-    #     task_folder = f'results/screenshots/screenshots_{mode}_{record_time}/{task_name_id}_{task_name}'
-        
-    if identifier is None:
-        task_folder = f'results/screenshots/screenshots_{mode}_{record_time}/{task_name}'
+    
+    # Use file_path if provided, otherwise use the old hardcoded path for backward compatibility
+    if file_path:
+        if identifier is None:
+            task_folder = os.path.join(file_path, "img_screenshots", task_name)
+        else:
+            task_folder = os.path.join(file_path, "img_screenshots", f"{identifier}_{task_name}")
     else:
-        task_folder = f'results/screenshots/screenshots_{mode}_{record_time}/{identifier}_{task_name}'
+        # old hardcoded path
+        if identifier is None:
+            task_folder = f'results/screenshots/screenshots_{mode}_{record_time}/{task_name}'
+        else:
+            task_folder = f'results/screenshots/screenshots_{mode}_{record_time}/{identifier}_{task_name}'
+        
     if not os.path.exists(task_folder):
         os.makedirs(task_folder)
 
     image_data = base64.b64decode(screenshot_base64)
     image = Image.open(BytesIO(image_data))
 
-    screenshot_filename = f'{task_folder}/Step{step_number}_{timestamp}_{description}.png'
+    # screenshot_filename = f'{task_folder}/{step_number}_{description}.png'
+    screenshot_filename = f'{task_folder}/{step_number}.png'
+    
 
     image.save(screenshot_filename)
 

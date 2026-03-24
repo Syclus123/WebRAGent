@@ -1,0 +1,32 @@
+OK-VQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: OK-VQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 10000
+    weight: 30
+ImageNet_1K:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: ImageNet_1K
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 10000
+    weight: 30
+WebQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: WebQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 10000
+    weight: 30
+MSCOCO:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: MSCOCO
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 10000
+    weight: 30

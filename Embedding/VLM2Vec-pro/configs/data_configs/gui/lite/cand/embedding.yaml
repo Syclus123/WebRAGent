@@ -1,0 +1,8 @@
+trajectory:
+  dataset_parser: "gui"
+  dataset_name: "/home/ubuntu/data/csb/Embedding/embedding/GAE-Bench-lite"
+  subset_name: "trajectory"
+  image_dir: "/home/ubuntu/data/csb/images/embedding/GAE-Bench/images"
+  dataset_split: "Online_Mind2Web"
+  # dataset_split: "GUIAct_mini"
+  num_sample_per_subset: null

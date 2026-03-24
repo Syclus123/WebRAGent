@@ -1,0 +1,9 @@
+# requirements/dev.txt
+# Development / linting / testing tools.
+# Install with:  pip install -r requirements/dev.txt
+
+ruff
+pytest
+pytest-asyncio
+mypy
+types-requests

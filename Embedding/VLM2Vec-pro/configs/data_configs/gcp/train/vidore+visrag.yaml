@@ -1,0 +1,14 @@
+colpali_train_set:
+    dataset_parser: vidore
+    dataset_name: vidore/colpali_train_set
+    weight: 1
+visrag-indomain:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-In-domain-data
+    global_dataset_name: VisRAG-Indomain-data
+    weight: 1
+visrag-synthetic:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-Synthetic-data
+    global_dataset_name: VisRAG-Synthetic-data
+    weight: 1

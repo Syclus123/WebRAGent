@@ -1,0 +1,10 @@
+DiDeMo:
+    dataset_parser: "didemo"
+    dataset_name: "DiDeMo"
+    dataset_split: "test"
+    video_root: "/fsx/home/ruimeng/data/MMEB_Pro/videos/video_ret/DiDeMo/"
+    frame_root: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_ret/DiDeMo/"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]

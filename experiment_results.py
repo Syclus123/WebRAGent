@@ -139,6 +139,19 @@ def write_task_result_to_df(each_task_json_file_path):
 
 
 def write_to_json(df):
+    if "score" not in df.columns:
+        df["score"] = "0 / 0"
+    if "match_func_result" not in df.columns:
+        df["match_func_result"] = "N/A" 
+    if "step_reward" not in df.columns:
+        df["step_reward"] = "{}"
+    if "error_message" not in df.columns:
+        df["error_message"] = ""
+    if "current_trace" not in df.columns:
+        df["current_trace"] = ""
+    if "execute_action" not in df.columns:
+        df["execute_action"] = ""
+        
     df["step_index"] = df["step_index"].apply(lambda x: int(x))
     df["trace_to_dict"] = df["current_trace"].apply(
         lambda x: parse_thought_action(x))
@@ -266,6 +279,25 @@ def evaluate(file_path, total_token_cost):
     result_file_path = file_path + "/result.json"
     all_data = read_json_result(input_file_path)
     df = pd.DataFrame(all_data)
+    
+    if df.empty or 'task_score' not in df.columns:
+        logger.info(f"WARNING: No valid result data, creating empty evaluation results")
+        result_dict = {
+            "task_counts": 0,
+            "average_step_score_rate": 0.0,
+            "average_efficiency_score": 0.0,
+            "key_node_completion_rate": 0.0,
+            "task_success_rate": 0.0,
+            "task_near_success_rate": 0.0
+        }
+        if total_token_cost != 0:
+            result_dict["usd_efficiency_score"] = 0.0
+        
+        with open(result_file_path, 'w') as json_file:
+            json.dump(result_dict, json_file)
+        logger.info(f'\033[31mEmpty evaluation results written to {result_file_path} !\033[0m')
+        return
+    
     df["step_score"] = df["task_score"].apply(lambda x: float(x.split("/")[0]))
     df["efficiency_score"] = [s / sc if sc != 0 else 0 for s, sc in zip(df['steps'], df['step_score'])]
     # The agent is only one key node away from completing the task

@@ -1,0 +1,31 @@
+MSCOCO:
+    dataset_parser: "mmeb_vg"
+    dataset_name: "MSCOCO"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+RefCOCO:
+    dataset_parser: "mmeb_vg"
+    dataset_name: "RefCOCO"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+RefCOCO-Matching:
+    dataset_parser: "mmeb_vg"
+    dataset_name: "RefCOCO-Matching"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+Visual7W-Pointing:
+    dataset_parser: "mmeb_vg"
+    dataset_name: "Visual7W-Pointing"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]

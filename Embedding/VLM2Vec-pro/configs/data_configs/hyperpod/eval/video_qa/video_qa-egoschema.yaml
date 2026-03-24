@@ -1,0 +1,6 @@
+egoschema:
+    dataset_parser: egoschema
+    video_dir: /fsx/home/ruimeng/data/lmms-lab/egoschema/videos
+    frame_dir: /fsx/home/ruimeng/data/MMEB_Pro/frames/video_qa/egoschema/
+    max_frames_saved: 64
+    num_frames: 8

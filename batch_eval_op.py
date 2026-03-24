@@ -9,11 +9,11 @@ Usage:
     sudo yum install -y xorg-x11-server-Xvfb
     xvfb-run -a python batch_eval_op.py
     
-    Ubuntu/Debian用户可以使用以下命令安装xvfb:
+    Ubuntu/Debian User:
     sudo apt-get update
     sudo apt-get install -y xvfb
 
-    xvfb-run -a python batch_eval_op.py --global_reward_mode dom_reward --global_reward_text_model gpt-4o-mini --snapshot test/exp --output_log test/exp/batch_operator_log.txt --rag_logging_enabled --rag_log_dir test/exp/rag_logs
+    xvfb-run -a python batch_eval_op.py --global_reward_mode dom_reward --global_reward_text_model gpt-4.1 --snapshot test/exp --output_log test/exp/batch_operator_log.txt --rag_mode vision_rag --rag_logging_enabled --rag_log_dir test/exp/rag_logs --prompt_logging_enabled --prompt_log_dir test/exp/prompt_logs --end_judge enabled --end_judge_confidence_threshold 0.8 --end_judge_min_steps 2 --consecutive_error_threshold 2
 """
 
 #!/usr/bin/env python3
@@ -29,7 +29,122 @@ def load_tasks(json_path):
         data = json.load(f)
     return data
 
-def run_single_operator_task(task, current_idx, args):
+def prebuild_rag_database(args):
+    """
+    Pre-build the RAG database and save to the specified path
+    """
+    print(f"\n{'='*80}")
+    print("building...")
+    print(f"{'='*80}")
+    
+    rag_cache_dir = os.path.join(args.snapshot, "rag_cache")
+    os.makedirs(rag_cache_dir, exist_ok=True)
+    
+    rag_index_path = os.path.join(rag_cache_dir, "rag_index.index")
+    if os.path.exists(rag_index_path) and not args.rebuild_rag:
+        print("✅ found existing RAG cache, skip pre-build")
+        print(f"📁 RAG cache path: {rag_cache_dir}")
+        return rag_cache_dir
+    try:
+        build_script = f"""
+import sys
+import os
+import json
+import toml
+import traceback
+
+embedding_path = 'Embedding/VLM2Vec-pro'
+if embedding_path not in sys.path:
+    sys.path.append(embedding_path)
+
+def build_and_save_rag():
+    try:
+        from rag_database import create_rag_database_from_config
+        
+        config_path = "configs/embedding.toml"
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                toml_config = toml.load(f)
+            
+            config = {{}}
+            for section_name, section_data in toml_config.items():
+                config.update(section_data)
+        else:
+            config = {{
+                "model_name": "/home/ubuntu/data/csb/Embedding/Qwen2-VL-TokenSelection-2B",
+                "checkpoint_path": "/home/ubuntu/data/csb/Embedding/experiments/train/qwen2_vl-lite_full-lora8-bsz128x8x2-interleave_0.2-lr5e5-max_step_256-warmup_12-uigraph_select_0.5-lm_skip_all-vis_skip_all/huggingface",
+                "model_backbone": "qwen2_vl_tokenselection",
+                "cand_json_path": "/home/ubuntu/data/csb/Embedding/data/processed_cand_with_task.json",
+                "embedding_parquet_path": "/home/ubuntu/data/csb/Embedding/data/trajectory_embedding.parquet",
+                "lora": True,
+                "pooling": "eos",
+                "normalize": True,
+                "resize_use_processor": True,
+                "max_len": 65536,
+                "per_device_eval_batch_size": 2,
+                "dataloader_num_workers": 2,
+                "device": "cuda"
+            }}
+        
+        print("🔄 initializing RAG database...")
+        rag_db = create_rag_database_from_config(**config)
+        
+        index_path = "{rag_cache_dir}/rag_index.index"
+        print(f"💾 saving RAG index to: {{index_path}}")
+        rag_db.save_index(index_path)
+        
+        config_save_path = "{rag_cache_dir}/rag_config.json"
+        with open(config_save_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        
+        print("✅ RAG database built successfully")
+        print(f"📁 index file: {{index_path}}")
+        print(f"🔧 config file: {{config_save_path}}")
+        return True
+        
+    except Exception as e:
+        print(f"RAG database build failed: {{e}}")
+        print(f"detailed error information: {{traceback.format_exc()}}")
+        return False
+
+if __name__ == "__main__":
+    success = build_and_save_rag()
+    exit(0 if success else 1)
+"""
+
+        script_path = os.path.join(rag_cache_dir, "build_rag.py")
+        with open(script_path, 'w', encoding='utf-8') as f:
+            f.write(build_script)
+        
+        if args.use_xvfb:
+            result = subprocess.run([
+                "xvfb-run", "-a", "python", script_path
+            ], capture_output=True, text=True, cwd=".")
+        else:
+            result = subprocess.run([
+                "python", script_path
+            ], capture_output=True, text=True, cwd=".")
+        
+        if result.returncode == 0:
+            print("RAG database built successfully")
+            print(f"RAG cache saved in: {rag_cache_dir}")
+            
+            try:
+                os.remove(script_path)
+            except:
+                pass
+                
+            return rag_cache_dir
+        else:
+            print(f"fail: {result.stderr}")
+            print(f"output: {result.stdout}")
+            return None
+            
+    except Exception as e:
+        print(f"❌ pre-build error: {e}")
+        return None
+
+def run_single_operator_task(task, current_idx, args, rag_cache_dir=None):
     task_name = task["confirmed_task"]
     website = task.get("website", "about:blank")
     task_id = task.get("task_id", f"task_{current_idx}")
@@ -42,6 +157,7 @@ def run_single_operator_task(task, current_idx, args):
         "--index", str(current_idx),
         "--single_task_name", task_name,
         "--single_task_website", website,
+        "--single_task_id", task_id,
         "--snapshot", args.snapshot,
         "--planning_text_model", args.planning_text_model,
         "--global_reward_text_model", args.global_reward_text_model,
@@ -62,14 +178,51 @@ def run_single_operator_task(task, current_idx, args):
     if args.rag_log_dir:
         command.extend(["--rag_log_dir", args.rag_log_dir])
     
+    # RAG mode
+    command.extend(["--rag_mode", args.rag_mode])
+    
+    # RAG cache
+    if rag_cache_dir:
+        command.extend(["--rag_cache_dir", rag_cache_dir])
+    
+    # Prompt logging
+    if args.prompt_logging_enabled:
+        command.append("--prompt_logging_enabled")
+    
+    # Prompt dir
+    if args.prompt_log_dir:
+        command.extend(["--prompt_log_dir", args.prompt_log_dir])
+    
+    # End judge
+    if hasattr(args, 'end_judge') and args.end_judge:
+        command.extend(["--end_judge", args.end_judge])
+    
+    if hasattr(args, 'end_judge_confidence_threshold') and args.end_judge_confidence_threshold:
+        command.extend(["--end_judge_confidence_threshold", str(args.end_judge_confidence_threshold)])
+    
+    if hasattr(args, 'end_judge_min_steps') and args.end_judge_min_steps:
+        command.extend(["--end_judge_min_steps", str(args.end_judge_min_steps)])
+    
+    if hasattr(args, 'consecutive_error_threshold') and args.consecutive_error_threshold:
+        command.extend(["--consecutive_error_threshold", str(args.consecutive_error_threshold)])
+    
     print(f"\n{'='*80}")
     print(f"🤖 Operator任务 [{current_idx}]: {task_name}")
     print(f"🌐 网站: {website}")
     print(f"🔧 任务ID: {task_id}")
     print(f"📱 模型: {args.planning_text_model}")
     print(f"📝 RAG日志: {'启用' if args.rag_logging_enabled else '禁用'}")
+    print(f"🧠 RAG模式: {args.rag_mode}")
+    print(f"💬 Prompt日志: {'启用' if args.prompt_logging_enabled else '禁用'}")
+    print(f"⚖️  End_Judge: {args.end_judge}")
+    if hasattr(args, 'consecutive_error_threshold'):
+        print(f"🔄 连续错误阈值: {args.consecutive_error_threshold}")
+    if rag_cache_dir:
+        print(f"🗄️  RAG缓存: {rag_cache_dir}")
     if args.rag_logging_enabled and args.rag_log_dir:
         print(f"📂 RAG日志目录: {args.rag_log_dir}")
+    if args.prompt_logging_enabled and args.prompt_log_dir:
+        print(f"💬 Prompt日志目录: {args.prompt_log_dir}")
     print(f"{'='*80}")
     
     try:
@@ -99,7 +252,7 @@ def main():
                         help='截图目录')
     parser.add_argument('--planning_text_model', type=str, default='computer-use-preview-2025-03-11',
                         help='规划文本模型: computer-use-preview-2025-03-11/gpt-4.1')
-    parser.add_argument('--global_reward_text_model', type=str, default='gpt-4o-mini',
+    parser.add_argument('--global_reward_text_model', type=str, default='gpt-4.1',
                         help='全局奖励文本模型: gpt-4.1/gpt-4o-mini')
     parser.add_argument('--start_idx', type=int, default=0,
                         help='开始任务的索引')
@@ -121,13 +274,33 @@ def main():
                         help='启用RAG日志记录')
     parser.add_argument('--rag_log_dir', type=str, default=None,
                         help='RAG日志文件的输出目录')
+    parser.add_argument('--rag_mode', type=str, default='description',
+                        choices=['description', 'vision', 'vision_rag', 'description_rag', 'none'],
+                        help='RAG mode: description / vision / vision_rag / description_rag / none')
+    parser.add_argument('--prompt_logging_enabled', action='store_true', default=False,
+                        help='启用Prompt日志记录')
+    parser.add_argument('--prompt_log_dir', type=str, default=None,
+                        help='Prompt日志文件的输出目录')
+    parser.add_argument('--end_judge', type=str, default='disabled',
+                        choices=['disabled', 'enabled', 'strict'],
+                        help='mode: disabled / enabled / strict')
+    parser.add_argument('--end_judge_confidence_threshold', type=float, default=0.8,
+                        help='confidence threshold (0.0-1.0)')
+    parser.add_argument('--end_judge_min_steps', type=int, default=2,
+                        help='minimum steps to start end judge')
+    parser.add_argument('--consecutive_error_threshold', type=int, default=2,
+                        help='Consecutive error threshold - how many consecutive errors to tolerate before stopping task')
+    parser.add_argument('--rebuild_rag', action='store_true', default=False,
+                        help='force rebuild RAG database (even if cache exists)')
+    parser.add_argument('--skip_rag_prebuild', action='store_true', default=False,
+                        help='skip RAG pre-build (for testing)')
     
     args = parser.parse_args()
     
     # load tasks
     json_path = Path(args.json_path)
     if not json_path.exists():
-        print(f"❌ 错误: 文件不存在 - {json_path}")
+        print(f"❌ failed to load json file - {json_path}")
         return
     
     tasks = load_tasks(json_path)
@@ -147,7 +320,15 @@ def main():
     os.makedirs(logs_dir, exist_ok=True)
     
     if args.output_log == 'results_operator/batch_exp1/logs/batch_operator_log.txt':
-        args.output_log = os.path.join(logs_dir, 'batch_operator_log.txt')
+        args.output_log = os.path.join(logs_dir, 'batch_operator_log.txt')     
+               
+    # pre-build RAG database (only in vision_rag mode)
+    rag_cache_dir = None
+    if args.rag_mode == "vision_rag" and not args.skip_rag_prebuild:
+        rag_cache_dir = prebuild_rag_database(args)
+        if rag_cache_dir is None:
+            print("❌ RAG database pre-build failed, exit batch tasks")
+            return
     
     # init log file
     with open(args.output_log, 'w', encoding='utf-8') as log_file:
@@ -159,15 +340,36 @@ def main():
         log_file.write(f"⏱️  任务间延迟: {args.delay}秒\n")
         log_file.write(f"🔄 最大重试次数: {args.max_retries}\n")
         log_file.write(f"📝 RAG日志: {'启用' if args.rag_logging_enabled else '禁用'}\n")
+        log_file.write(f"🧠 RAG模式: {args.rag_mode}\n")
+        log_file.write(f"💬 Prompt日志: {'启用' if args.prompt_logging_enabled else '禁用'}\n")
+        log_file.write(f"⚖️  结束判断模式: {getattr(args, 'end_judge', 'disabled')}\n")
+        if getattr(args, 'end_judge', 'disabled') != 'disabled':
+            log_file.write(f"🎯 结束判断信心阈值: {getattr(args, 'end_judge_confidence_threshold', 0.8)}\n")
+            log_file.write(f"📊 结束判断最少步数: {getattr(args, 'end_judge_min_steps', 2)}\n")
+            log_file.write(f"🔄 连续错误阈值: {getattr(args, 'consecutive_error_threshold', 2)}\n")
         if args.rag_logging_enabled and args.rag_log_dir:
             log_file.write(f"📂 RAG日志目录: {args.rag_log_dir}\n")
+        if args.prompt_logging_enabled and args.prompt_log_dir:
+            log_file.write(f"💬 Prompt日志目录: {args.prompt_log_dir}\n")
+        if rag_cache_dir:
+            log_file.write(f"🗄️  RAG缓存目录: {rag_cache_dir}\n")
         log_file.write("\n")
     
     print(f"🚀 开始OpenAI Operator批量任务评估")
     print(f"📊 任务范围: {start_idx} - {end_idx-1} (共{total_tasks}个任务)")
     print(f"🤖 使用模型: {args.planning_text_model}")
+    print(f"🧠 RAG模式: {args.rag_mode}")
+    print(f"💬 Prompt日志: {'启用' if args.prompt_logging_enabled else '禁用'}")
+    # print(f"结束判断模式: {getattr(args, 'end_judge', 'disabled')}")
+    # if getattr(args, 'end_judge', 'disabled') != 'disabled':
+        # print(f"结束判断信心阈值: {getattr(args, 'end_judge_confidence_threshold', 0.8)}")
+        # print(f"结束判断最少步数: {getattr(args, 'end_judge_min_steps', 2)}")
     print(f"📁 结果目录: {args.snapshot}")
     print(f"📸 截图目录: {img_screenshots_dir}")
+    if args.prompt_logging_enabled and args.prompt_log_dir:
+        print(f"💬 Prompt日志目录: {args.prompt_log_dir}")
+    if rag_cache_dir:
+        print(f"🗄️  RAG缓存目录: {rag_cache_dir}")
     
     for i, task_data in enumerate(tasks[start_idx:end_idx]):
         current_idx = start_idx + i
@@ -188,7 +390,7 @@ def main():
                 with open(args.output_log, 'a', encoding='utf-8') as log_file:
                     log_file.write(f"🔄 重试第{attempt}次\n")
             
-            success = run_single_operator_task(task_data, current_idx, args)
+            success = run_single_operator_task(task_data, current_idx, args, rag_cache_dir)
             if success:
                 break
             elif attempt < args.max_retries:

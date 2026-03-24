@@ -1,0 +1,79 @@
+ImageNet-1K:
+    dataset_parser: "mmeb_cls"
+    dataset_name: "ImageNet-1K"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+N24News:
+    dataset_parser: "mmeb_cls"
+    dataset_name: "N24News"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+HatefulMemes:
+    dataset_parser: "mmeb_cls"
+    dataset_name: "HatefulMemes"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+VOC2007:
+    dataset_parser: "mmeb_cls"
+    dataset_name: "VOC2007"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+SUN397:
+    dataset_parser: "mmeb_cls"
+    dataset_name: "SUN397"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+Place365:
+    dataset_parser: "mmeb_cls"
+    dataset_name: "Place365"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+ImageNet-A:
+    dataset_parser: "mmeb_cls"
+    dataset_name: "ImageNet-A"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+ImageNet-R:
+    dataset_parser: "mmeb_cls"
+    dataset_name: "ImageNet-R"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+ObjectNet:
+    dataset_parser: "mmeb_cls"
+    dataset_name: "ObjectNet"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+Country211:
+    dataset_parser: "mmeb_cls"
+    dataset_name: "Country211"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]

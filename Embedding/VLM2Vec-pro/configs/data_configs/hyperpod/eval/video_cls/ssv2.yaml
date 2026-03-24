@@ -1,0 +1,10 @@
+SmthSmthV2:
+    dataset_parser: "ssv2"
+    dataset_name: "ssv2"
+    dataset_split: "validation"
+    data_path: "/fsx/home/ruimeng/data/MMEB_Pro/data/ssv2.jsonl"
+    video_dir: ""
+    frame_dir: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_cls/SSv2"
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]

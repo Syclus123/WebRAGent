@@ -1,0 +1,95 @@
+nq:
+    dataset_parser: beir
+    dataset_name: nq
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_nqtrain_train.jsonl
+    weight: 4
+    size: 132803
+webis-touche2020-title:
+    dataset_parser: beir
+    dataset_name: webis-touche2020
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_webis-touche2020_title.jsonl
+    weight: 3
+    size: 382000
+hotpotqa:
+    dataset_parser: beir
+    dataset_name: hotpotqa
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_hotpotqa_train.jsonl
+    weight: 3
+    size: 170000
+dbpedia-entity:
+    dataset_parser: beir
+    dataset_name: dbpedia-entity
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_dbpedia-entity_title.jsonl
+    weight: 3
+    size: 4635922
+fever:
+    dataset_parser: beir
+    dataset_name: fever
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_fever_train.jsonl
+    weight: 2
+    size: 140085
+cqadupstack:
+    dataset_parser: beir
+    dataset_name: cqadupstack
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/st_stackexchange_duplicate_questions_title-body_title-body_train.jsonl
+    weight: 2
+    size: 457000
+scidocs-wizardlm2:
+    dataset_parser: beir
+    dataset_name: SCIDOCS
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_scidocs-10k_wizardlm2.jsonl
+    weight: 2
+    size: 5000
+arguana-wizardlm2:
+    dataset_parser: beir
+    dataset_name: ArguAna
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_arguana-5k_wizardlm2.jsonl
+    weight: 2
+    size: 5000
+berri:
+    dataset_parser: berri
+    dataset_name: berri
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/berri/tart_dual_train_data.jsonl
+    weight: 3
+    size: 5176910
+msmarco:
+    dataset_parser: beir
+    dataset_name: msmarco
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/st_msmarco-triplets_train.jsonl
+    weight: 3
+    size: 499184
+    posneg_margin: 0.1
+nfcorpus:
+    dataset_parser: beir
+    dataset_name: nfcorpus
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_nfcorpus_train.jsonl
+    weight: 1
+    size: 110575
+    hardneg_range: 0-50
+scifact:
+    dataset_parser: beir
+    dataset_name: scifact
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_scifact_train.jsonl
+    weight: 1
+    size: 920
+fiqa:
+    dataset_parser: beir
+    dataset_name: fiqa
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_fiqa_train.jsonl
+    weight: 1
+    size: 14166
+    posneg_margin: 0.05
+quora:
+    dataset_parser: beir
+    dataset_name: quora
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/st_quora_duplicates_triplets_train.jsonl
+    prevneg_ratio: 1.0
+    weight: 1
+    size: 101762
+    posneg_ratio: 0.9
+scifact-wizardlm2:
+    dataset_parser: beir
+    dataset_name: SciFact
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_scifact-all_wizardlm2.jsonl
+    weight: 1
+    size: 4900

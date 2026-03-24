@@ -1,0 +1,6 @@
+MVBench:
+    dataset_parser: mvbench
+    video_dir: /fsx/home/ruimeng/data/MVBench/videos
+    frame_dir: /fsx/home/ruimeng/data/MVBench/frames
+    max_frames_saved: 6465
+    num_frames: 8

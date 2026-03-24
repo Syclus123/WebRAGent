@@ -1,0 +1,28 @@
+# requirements/base.txt
+# Core runtime dependencies for WebRAGent.
+# Install with:  pip install -r requirements/base.txt
+
+playwright
+openai
+anthropic
+google-generativeai
+chromadb
+jinja2
+json5
+toml
+tiktoken
+pillow
+colorlog
+requests
+pandas
+pyarrow
+tenacity
+aiohttp
+wandb
+sanic
+fastapi
+uvicorn
+beautifulsoup4
+lxml
+retry
+backoff

@@ -1,0 +1,10 @@
+YouCook2:
+    dataset_parser: "youcook2"
+    dataset_name: "YouCook2"
+    dataset_split: "test"
+    video_root: "/fsx/home/ruimeng/data/MMEB_Pro/videos/video_ret/YouCook2/"
+    frame_root: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_ret/YouCook2/"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]

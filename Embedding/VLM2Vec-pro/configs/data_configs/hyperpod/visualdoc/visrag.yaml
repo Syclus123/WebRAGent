@@ -1,0 +1,10 @@
+visrag-indomain:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-In-domain-data
+    global_dataset_name: VisRAG-Indomain-data
+    weight: 1
+visrag-synthetic:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-Synthetic-data
+    global_dataset_name: VisRAG-Synthetic-data
+    weight: 1

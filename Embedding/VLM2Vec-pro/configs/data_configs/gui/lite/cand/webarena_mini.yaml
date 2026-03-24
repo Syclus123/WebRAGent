@@ -1,0 +1,23 @@
+state:
+    dataset_parser: "gui"
+    dataset_name: "/data/embedding/GAE-Bench-lite"
+    subset_name: "state"
+    image_dir: "/data/embedding/GAE-Bench/images"
+    dataset_split: "WebArena_mini"
+    num_sample_per_subset: null
+  
+trajectory:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "trajectory"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "WebArena_mini"
+  num_sample_per_subset: null
+
+interval:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "interval"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "WebArena_mini"
+  num_sample_per_subset: null

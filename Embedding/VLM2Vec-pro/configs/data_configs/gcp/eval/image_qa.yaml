@@ -1,0 +1,89 @@
+OK-VQA:
+    dataset_parser: "image_qa"
+    dataset_name: "OK-VQA"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+A-OKVQA:
+    dataset_parser: "image_qa"
+    dataset_name: "A-OKVQA"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+DocVQA:
+    dataset_parser: "image_qa"
+    dataset_name: "DocVQA"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+InfographicsVQA:
+    dataset_parser: "image_qa"
+    dataset_name: "InfographicsVQA"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+ChartQA:
+    dataset_parser: "image_qa"
+    dataset_name: "ChartQA"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+Visual7W:
+    dataset_parser: "image_qa"
+    dataset_name: "Visual7W"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+ScienceQA:
+    dataset_parser: "image_qa"
+    dataset_name: "ScienceQA"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+VizWiz:
+    dataset_parser: "image_qa"
+    dataset_name: "VizWiz"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+GQA:
+    dataset_parser: "image_qa"
+    dataset_name: "GQA"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+TextVQA:
+    dataset_parser: "image_qa"
+    dataset_name: "TextVQA"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local

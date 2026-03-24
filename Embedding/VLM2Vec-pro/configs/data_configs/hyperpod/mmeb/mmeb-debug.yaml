@@ -1,0 +1,32 @@
+colpali_train_set:
+    dataset_parser: vidore
+    dataset_name: vidore/colpali_train_set
+    weight: 1
+OK-VQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: OK-VQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    weight: 1
+ImageNet_1K:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: ImageNet_1K
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    weight: 1
+WebQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: WebQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    weight: 1
+MSCOCO:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: MSCOCO
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    weight: 1

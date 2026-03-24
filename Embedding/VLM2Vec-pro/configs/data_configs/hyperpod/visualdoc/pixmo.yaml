@@ -1,0 +1,4 @@
+pixmo:
+    dataset_parser: pixmo
+    dataset_name: Tevatron/pixmo-docs
+    weight: 1

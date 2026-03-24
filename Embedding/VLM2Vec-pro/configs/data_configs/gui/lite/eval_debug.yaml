@@ -1,0 +1,21 @@
+AutoWebGLM-ood:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ood"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "AutoWebGLM"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/autowebglm_mini.yaml"
+
+AutoWebGLM-ind:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ind"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "AutoWebGLM"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/autowebglm_mini.yaml"

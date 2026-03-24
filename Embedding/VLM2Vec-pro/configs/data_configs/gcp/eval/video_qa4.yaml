@@ -1,0 +1,33 @@
+Video-MME:
+    dataset_parser: videomme
+    video_dir: video-tasks/videos/video_qa/Video-MME
+    frame_dir: video-tasks/frames/video_qa/Video-MME
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+NExTQA:
+    dataset_parser: nextqa
+    video_dir: video-tasks/videos/video_qa/NExTQA
+    frame_dir: video-tasks/frames/video_qa/NExTQA
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+egoschema:
+    dataset_parser: egoschema
+    video_dir: video-tasks/videos/video_qa/egoschema
+    frame_dir: video-tasks/frames/video_qa/egoschema
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+ActivityNetQA:
+    dataset_parser: activitynetqa
+    data_path: video-tasks/data/activitynetqa.jsonl
+    video_dir: video-tasks/videos/video_qa/ActivityNetQA
+    frame_dir: video-tasks/frames/video_qa/ActivityNetQA
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local

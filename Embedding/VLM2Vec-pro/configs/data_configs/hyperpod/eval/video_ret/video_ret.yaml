@@ -1,0 +1,55 @@
+MSR-VTT:
+    dataset_parser: "msrvtt"
+    dataset_name: "MSR-VTT"
+    dataset_split: "test"
+    video_root: "/fsx/home/ruimeng/data/MMEB_Pro/videos/video_ret/MSR-VTT/"
+    frame_root: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_ret/MSR-VTT/"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+
+DiDeMo:
+    dataset_parser: "didemo"
+    dataset_name: "DiDeMo"
+    dataset_split: "test"
+    video_root: "/fsx/home/ruimeng/data/MMEB_Pro/videos/video_ret/DiDeMo/"
+    frame_root: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_ret/DiDeMo/"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+
+
+MSVD:
+    dataset_parser: "msvd"
+    dataset_name: "MSVD"
+    dataset_split: "test"
+    video_root: "/fsx/home/ruimeng/data/MMEB_Pro/videos/video_ret/MSVD/"
+    frame_root: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_ret/MSVD/"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+
+YouCook2:
+    dataset_parser: "youcook2"
+    dataset_name: "YouCook2"
+    dataset_split: "test"
+    video_root: "/fsx/home/ruimeng/data/MMEB_Pro/videos/video_ret/YouCook2/"
+    frame_root: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_ret/YouCook2/"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+
+VATEX:
+    dataset_parser: "vatex"
+    dataset_name: "VATEX"
+    dataset_split: "test"
+    video_root: "/fsx/home/ruimeng/data/MMEB_Pro/videos/video_ret/VATEX/"
+    frame_root: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_ret/VATEX/"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]

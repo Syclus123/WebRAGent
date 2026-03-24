@@ -1,0 +1,7 @@
+VideoMMMU:
+    dataset_parser: videommmu
+    video_dir: /fsx/home/ruimeng/data/lmms-lab/VideoMMMU
+    frame_dir: /fsx/home/ruimeng/data/lmms-lab/VideoMMMU/frames
+#    num_sample_per_subset: 100
+    max_frames_saved: 64
+    num_frames: 8

@@ -77,14 +77,14 @@ def print_statistics(stats, file_name):
         print(f"Examples of task ids with unknown difficulty levels: {unknown_level_tasks[:3]}")
 
 def calculate_success_rates():
-    with open("../WebCanvas/data/Online-Mind2Web/Online_Mind2Web.json", "r") as f:
+    with open("data/Online-Mind2Web/Online_Mind2Web.json", "r") as f:
         task_levels = json.load(f)
 
     task_id_to_level = {task["task_id"]: task["level"] for task in task_levels}
     
     # define the result files to process
     results_files = [
-        "../WebCanvas/results/WebJudge_Online_Mind2Web_eval_gpt-4o_score_threshold_3_auto_eval_results.json"
+        "/XXXX.json"
         ]
     
     for results_file in results_files:

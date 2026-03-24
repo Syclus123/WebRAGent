@@ -1,8 +1,9 @@
 [basic]
 task_mode = "single_task"    # single_task or batch_tasks
-max_time_step = 20           # For all tasks, set the maximum step length
+max_time_step = 80           # For all tasks, set the maximum step length
 save_screenshots = true  # screenshots
 screenshot_path = "./screenshots"
+disable_duplicate_screenshots = true  # Disable duplicate screenshot storage
 
 [model]
 json_model_response = false      # Whether to require a model to strictly output json format, currently only support OPENAI models.
@@ -21,7 +22,7 @@ json_models = ["gpt-4-turbo",
                    ]
 
 [rag]
-enabled = true          # Whether to enable RAG mode
+enabled = true          # Whether to enable RAG mode (true/false)
 rag_path = "./data/Online-Mind2Web/rag_data"    # Path to store RAG data
 
 # OpenAI Operator specific settings
@@ -34,8 +35,8 @@ rag_integration = true                  # Whether to integrate RAG with operator
 
 [steps]
 interaction_mode = false            #  Whether human control of task execution status is required
-single_task_action_step = 20     
-batch_tasks_max_action_step =25
+single_task_action_step = 80     
+batch_tasks_max_action_step =80
 batch_tasks_condition_step_increase = 5
 
 [files]
@@ -100,6 +101,7 @@ gpt-3.5-turbo-0125_output_price     = 0.0000015
 gpt-3.5-turbo-1106_input_price      = 0.000001
 gpt-3.5-turbo-1106_output_price     = 0.000002
 o4-mini                             = 0.000002
+computer-use-preview-2025-03-11     = 0.000005
 # OpenAI Operator pricing (estimated - adjust based on actual pricing)
 computer-use-preview-2025-03-11_input_price  = 0.00001
 computer-use-preview-2025-03-11_output_price = 0.00003

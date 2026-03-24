@@ -1,0 +1,8 @@
+MVBench:
+    dataset_parser: mvbench
+    video_dir: video-tasks/videos/video_qa/mvbench
+    frame_dir: video-tasks/frames/video_qa/MVBench
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local

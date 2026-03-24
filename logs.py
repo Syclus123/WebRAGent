@@ -64,3 +64,4 @@ stream_handler.setFormatter(stream_formatter)
 
 logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
+# Deprecated: use webragent.utils.logging_config instead

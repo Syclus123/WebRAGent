@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Computer‑Use demo (resilient version)
-    run: python test.py   --task "Search for 2025 AI tools news and click on the first OpenAI results"   --out-dir ./cua_images   --json-out ./cua_trace.json
+    run: python operator_demo.py   --task "Search for 2025 AI tools news and click on the first OpenAI results"   --out-dir ./cua_test/cua_images   --json-out ./cua_test/cua_trace.json
 """
 
 import os, sys, json, time, base64, argparse, openai

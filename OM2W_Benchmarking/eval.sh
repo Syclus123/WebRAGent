@@ -1,4 +1,3 @@
-
 # api_key=API_KEY
 # model_name=MODEL_NAME
 api_key=${OPENAI_API_KEY}
@@ -14,8 +13,7 @@ modes=(
     # "AgentTrek_eval"
 )
 
-# base_dir="./data/example"
-base_dir="../WebCanvas/dataset_new/exp"
+base_dir="dataset"
 
 for mode in "${modes[@]}"; do
     python ./OM2W_Benchmarking/src/run.py \

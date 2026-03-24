@@ -1,0 +1,274 @@
+nq:
+    dataset_parser: beir
+    dataset_name: nq
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_nqtrain_train.jsonl
+    weight: 4
+    size: 132803
+webis-touche2020-title:
+    dataset_parser: beir
+    dataset_name: webis-touche2020
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_webis-touche2020_title.jsonl
+    weight: 3
+    size: 382000
+hotpotqa:
+    dataset_parser: beir
+    dataset_name: hotpotqa
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_hotpotqa_train.jsonl
+    weight: 3
+    size: 170000
+dbpedia-entity:
+    dataset_parser: beir
+    dataset_name: dbpedia-entity
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_dbpedia-entity_title.jsonl
+    weight: 3
+    size: 4635922
+fever:
+    dataset_parser: beir
+    dataset_name: fever
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_fever_train.jsonl
+    weight: 2
+    size: 140085
+cqadupstack:
+    dataset_parser: beir
+    dataset_name: cqadupstack
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/st_stackexchange_duplicate_questions_title-body_title-body_train.jsonl
+    weight: 2
+    size: 457000
+scidocs-wizardlm2:
+    dataset_parser: beir
+    dataset_name: SCIDOCS
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_scidocs-10k_wizardlm2.jsonl
+    weight: 2
+    size: 5000
+arguana-wizardlm2:
+    dataset_parser: beir
+    dataset_name: ArguAna
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_arguana-5k_wizardlm2.jsonl
+    weight: 2
+    size: 5000
+berri:
+    dataset_parser: berri
+    dataset_name: berri
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/berri/tart_dual_train_data.jsonl
+    weight: 3
+    size: 5176910
+msmarco:
+    dataset_parser: beir
+    dataset_name: msmarco
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/st_msmarco-triplets_train.jsonl
+    weight: 3
+    size: 499184
+    posneg_margin: 0.1
+nfcorpus:
+    dataset_parser: beir
+    dataset_name: nfcorpus
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_nfcorpus_train.jsonl
+    weight: 1
+    size: 110575
+    hardneg_range: 0-50
+scifact:
+    dataset_parser: beir
+    dataset_name: scifact
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_scifact_train.jsonl
+    weight: 1
+    size: 920
+fiqa:
+    dataset_parser: beir
+    dataset_name: fiqa
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_fiqa_train.jsonl
+    weight: 1
+    size: 14166
+    posneg_margin: 0.05
+quora:
+    dataset_parser: beir
+    dataset_name: quora
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/st_quora_duplicates_triplets_train.jsonl
+    prevneg_ratio: 1.0
+    weight: 1
+    size: 101762
+    posneg_ratio: 0.9
+scifact-wizardlm2:
+    dataset_parser: beir
+    dataset_name: SciFact
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_scifact-all_wizardlm2.jsonl
+    weight: 1
+    size: 4900
+ImageNet_1K:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: ImageNet_1K
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 100000
+    weight: 1
+
+N24News:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: N24News
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 50000
+    weight: 1
+
+HatefulMemes:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: HatefulMemes
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 10000
+    weight: 0.2
+
+VOC2007:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: VOC2007
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 10000
+    weight: 0.2
+
+SUN397:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: SUN397
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 20000
+    weight: 0.5
+
+OK-VQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: OK-VQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 10000
+    weight: 0.2
+
+A-OKVQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: A-OKVQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 20000
+    weight: 0.5
+
+DocVQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: DocVQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 40000
+    weight: 1
+
+InfographicsVQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: InfographicsVQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 25000
+    weight: 0.5
+
+ChartQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: ChartQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 28000
+    weight: 0.5
+
+Visual7W:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: Visual7W
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 70000
+    weight: 1
+
+VisDial:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: VisDial
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 130000
+    weight: 1
+
+CIRR:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: CIRR
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 30000
+    weight: 0.5
+
+VisualNews_t2i:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: VisualNews_t2i
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 100000
+    weight: 1
+
+VisualNews_i2t:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: VisualNews_i2t
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 100000
+    weight: 1
+
+MSCOCO_t2i:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: MSCOCO_t2i
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 100000
+    weight: 1
+
+MSCOCO_i2t:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: MSCOCO_i2t
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 120000
+    weight: 1
+
+NIGHTS:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: NIGHTS
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 20000
+    weight: 0.5
+
+WebQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: WebQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 20000
+    weight: 0.5
+
+MSCOCO:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: MSCOCO
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    num_sample_per_subset: 100000
+    weight: 1

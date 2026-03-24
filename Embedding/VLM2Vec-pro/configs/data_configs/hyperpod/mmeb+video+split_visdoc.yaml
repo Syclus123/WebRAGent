@@ -1,0 +1,88 @@
+colpali_train_infographic:
+    dataset_parser: vidore
+    num_rows: 10038
+    dataset_path: /fsx/sfr/data/MMEB/Visual_Doc/vidore/Infographic-VQA.parquet
+    weight: 2
+colpali_train_arxivqa:
+    dataset_parser: vidore
+    num_rows: 9949
+    dataset_path: /fsx/sfr/data/MMEB/Visual_Doc/vidore/arxiv_qa.parquet
+    weight: 2
+colpali_train_pdf:
+    dataset_parser: vidore
+    num_rows: 45718
+    dataset_path: /fsx/sfr/data/MMEB/Visual_Doc/vidore/pdf.parquet
+    weight: 2
+colpali_train_tatdqa:
+    dataset_parser: vidore
+    num_rows: 13188
+    dataset_path: /fsx/sfr/data/MMEB/Visual_Doc/vidore/tatdqa.parquet
+    weight: 2
+colpali_train_docvqa:
+    dataset_parser: vidore
+    num_rows: 39302
+    dataset_path: /fsx/sfr/data/MMEB/Visual_Doc/vidore/docvqa.parquet
+    weight: 2
+visrag-indomain_arxivqa:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-In-domain-data
+    global_dataset_name: VisRAG-Indomain-data
+    dataset_path: /fsx/sfr/data/MMEB/Visual_Doc/visrag/Train_in_domain_data/ArxivQA.parquet
+    weight: 2
+visrag-indomain_chartqa:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-In-domain-data
+    global_dataset_name: VisRAG-Indomain-data
+    dataset_path: /fsx/sfr/data/MMEB/Visual_Doc/visrag/Train_in_domain_data/ChartQA.parquet
+    weight: 2
+visrag-indomain_infovqa:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-In-domain-data
+    global_dataset_name: VisRAG-Indomain-data
+    dataset_path: /fsx/sfr/data/MMEB/Visual_Doc/visrag/Train_in_domain_data/InfoVQA.parquet
+    weight: 2
+visrag-indomain_mpdocvqa:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-In-domain-data
+    global_dataset_name: VisRAG-Indomain-data
+    dataset_path: /fsx/sfr/data/MMEB/Visual_Doc/visrag/Train_in_domain_data/MP-DocVQA.parquet
+    weight: 2
+visrag-indomain_plotqa:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-In-domain-data
+    global_dataset_name: VisRAG-Indomain-data
+    dataset_path: /fsx/sfr/data/MMEB/Visual_Doc/visrag/Train_in_domain_data/PlotQA.parquet
+    weight: 2
+visrag-indomain_slidevqa:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-In-domain-data
+    global_dataset_name: VisRAG-Indomain-data
+    dataset_path: /fsx/sfr/data/MMEB/Visual_Doc/visrag/Train_in_domain_data/SlideVQA.parquet
+    weight: 2
+
+video_caption_300k:
+    dataset_parser: llavahound_caption
+    dataset_name: video_caption_300k
+    dataset_path: /fsx/home/ruimeng/data/train_video_and_instruction/video_instruction/train/sft/video_caption_300k.jsonl
+    video_frame_basedir: /fsx/home/ruimeng/data/train_video_and_instruction/train_300k
+    weight: 5
+    num_rows: 300_000
+    num_frames: 8
+    data_mode: caption_retrieval
+video_caption_300k-video:
+    dataset_parser: llavahound_caption
+    dataset_name: video_caption_300k
+    dataset_path: /fsx/home/ruimeng/data/train_video_and_instruction/video_instruction/train/sft/video_caption_300k.jsonl
+    video_frame_basedir: /fsx/home/ruimeng/data/train_video_and_instruction/train_300k
+    weight: 5
+    num_rows: 300_000
+    num_frames: 8
+    data_mode: video_retrieval
+video_qa_240k:
+    dataset_parser: llavahound_qa
+    dataset_name: video_qa_240k
+    dataset_path: /fsx/home/ruimeng/data/train_video_and_instruction/video_instruction/train/sft/video_qa_240k.jsonl
+    video_frame_basedir: /fsx/home/ruimeng/data/train_video_and_instruction/train_300k
+    weight: 5
+    num_rows: 240_000
+    num_frames: 8

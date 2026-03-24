@@ -1,0 +1,54 @@
+HMDB51:
+    dataset_parser: "video_classification"
+    dataset_name: "hmdb51"
+    dataset_split: "test"
+    data_path: "/fsx/home/ruimeng/data/MMEB_Pro/data/hmdb51.jsonl"
+    video_dir: ""
+    frame_dir: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_cls/HMDB51"
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+
+UCF101:
+    dataset_parser: "video_classification"
+    dataset_name: "ucf101"
+    dataset_split: "test"
+    data_path: "/fsx/home/ruimeng/data/MMEB_Pro/data/ucf101.jsonl"
+    video_dir: ""
+    frame_dir: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_cls/UCF101"
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+
+SmthSmthV2:
+    dataset_parser: "ssv2"
+    dataset_name: "ssv2"
+    dataset_split: "validation"
+    data_path: "/fsx/home/ruimeng/data/MMEB_Pro/data/ssv2.jsonl"
+    video_dir: ""
+    frame_dir: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_cls/SSv2"
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+
+K700:
+    dataset_parser: "video_classification"
+    dataset_name: "k700"
+    dataset_split: "validation"
+    data_path: "/fsx/home/ruimeng/data/MMEB_Pro/data/k700.jsonl"
+    video_dir: ""
+    frame_dir: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_cls/K700"
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+
+Breakfast:
+    dataset_parser: "video_classification"
+    dataset_name: "breakfast"
+    dataset_split: "validation"
+    data_path: "/fsx/home/ruimeng/data/MMEB_Pro/data/breakfast.jsonl"
+    video_dir: ""
+    frame_dir: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_cls/Breakfast"
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]

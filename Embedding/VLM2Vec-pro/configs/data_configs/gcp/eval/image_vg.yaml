@@ -1,0 +1,35 @@
+MSCOCO:
+    dataset_parser: "image_i2i_vg"
+    dataset_name: "MSCOCO"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+RefCOCO:
+    dataset_parser: "image_i2i_vg"
+    dataset_name: "RefCOCO"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+RefCOCO-Matching:
+    dataset_parser: "image_i2i_vg"
+    dataset_name: "RefCOCO-Matching"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local
+
+Visual7W-Pointing:
+    dataset_parser: "image_i2i_vg"
+    dataset_name: "Visual7W-Pointing"
+    dataset_split: "test"
+    image_root: "image-tasks/"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+    eval_type: local

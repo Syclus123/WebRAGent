@@ -379,6 +379,13 @@ async def run_task(
         website=None,
         rag_enabled=False,
         rag_path=None,
+        rag_log_dir=None,
+        end_judge_mode="disabled",
+        end_judge_confidence_threshold=0.8,
+        end_judge_min_steps=2,
+        consecutive_error_threshold=2,
+        rag_mode="description",
+        rag_cache_dir=None,
 ):  
     await env.reset(website if website else "about:blank")
 
@@ -400,6 +407,11 @@ async def run_task(
     task_finished = False
     task_global_status = ""
     human_interaction_stop_status = False
+    
+    # DOM mode completion manager and End Judge initialization
+    dom_completion_manager = None
+    dom_end_judge = None
+    recent_thoughts = []  # store recent thoughts for DOM mode judgment
 
     # Configuration related to controlling the length of steps
     conditions = config["conditions"]
@@ -414,6 +426,29 @@ async def run_task(
         max_steps = int(
             max(config['steps']['batch_tasks_max_action_step'], 1.5 * reference_task_length))
     additional_steps = 0
+    
+    if mode == "dom" and end_judge_mode != "disabled":
+        logger.info(f"🏆 Initializing DOM mode completion management with end_judge: {end_judge_mode}")
+        
+        from agent.Utils.task_completion_manager import create_task_completion_manager
+        from agent.Utils.end_judge import create_end_judge
+        
+        dom_completion_manager = create_task_completion_manager(
+            max_steps=max_steps,
+            loop_threshold=5,
+            low_performance_threshold=8
+        )
+
+        dom_end_judge = create_end_judge(
+            mode=end_judge_mode,
+            model_name="gpt-4o",
+            confidence_threshold=end_judge_confidence_threshold,
+            min_steps=end_judge_min_steps,
+            consecutive_error_threshold=consecutive_error_threshold
+        )
+        
+        logger.info(f"⚖️  DOM End judge initialized: {dom_end_judge.is_enabled() if dom_end_judge else False}")
+        logger.info(f"📊 DOM Completion manager initialized with max_steps: {max_steps}")
 
     # Store the results of the planning process for a task
     task_result = {}
@@ -459,30 +494,36 @@ async def run_task(
         
         # Screenshot at the beginning of each step
         if screenshot_params:
-            if mode in ["d_v", "dom_v_desc", "vision_to_dom"]:
+            disable_duplicates = config.get('basic', {}).get('disable_duplicate_screenshots', False)
+            
+            if mode in ["d_v", "dom_v_desc", "vision_to_dom", "dom"]:
                 observation, observation_VforD = await env.get_obs()
                 if is_valid_base64(observation_VforD):
-                    save_screenshot(
-                        mode=screenshot_params["mode"],
-                        record_time=screenshot_params["record_time"],
-                        task_name=screenshot_params["task_name"],
-                        step_number=num_steps,
-                        description=f"step_{num_steps}",
-                        screenshot_base64=observation_VforD,
-                        task_name_id=screenshot_params.get("task_name_id")
-                    )
+                    if not disable_duplicates:
+                        save_screenshot(
+                            mode=screenshot_params["mode"],
+                            record_time=screenshot_params["record_time"],
+                            task_name=screenshot_params["task_name"],
+                            step_number=num_steps,
+                            description=f"step_{num_steps}",
+                            screenshot_base64=observation_VforD,
+                            task_name_id=screenshot_params.get("task_name_id"),
+                            file_path=screenshot_params["file_path"]
+                        )
             else:
                 observation = await env.get_obs()
                 if isinstance(observation, dict) and is_valid_base64(observation.get("screenshot", "")):
-                    save_screenshot(
-                        mode=screenshot_params["mode"],
-                        record_time=screenshot_params["record_time"],
-                        task_name=screenshot_params["task_name"],
-                        step_number=num_steps,
-                        description=f"step_{num_steps}",
-                        screenshot_base64=observation["screenshot"],
-                        task_name_id=screenshot_params.get("task_name_id")
-                    )
+                    if not disable_duplicates:
+                        save_screenshot(
+                            mode=screenshot_params["mode"],
+                            record_time=screenshot_params["record_time"],
+                            task_name=screenshot_params["task_name"],
+                            step_number=num_steps,
+                            description=f"step_{num_steps}",
+                            screenshot_base64=observation["screenshot"],
+                            task_name_id=screenshot_params.get("task_name_id"),
+                            file_path=screenshot_params["file_path"]
+                        )
             
             # save HTML(Optional)
             # html_content = await env.page.content()
@@ -493,8 +534,9 @@ async def run_task(
             #     html_file.write(html_content)
                 
             # save screenshot
-            png_save_path = os.path.join(screenshot_params["file_path"], "img_screenshots", f"{screenshot_params['task_name']}",
-                                           f"step_{num_steps}_{screenshot_params['record_time']}.png")
+            # png_save_path = os.path.join(screenshot_params["file_path"], "img_screenshots", f"{screenshot_params['task_name']}",f"step_{num_steps}_{screenshot_params['record_time']}.png")
+            png_save_path = os.path.join(screenshot_params["file_path"], "img_screenshots", f"{screenshot_params['task_name']}",f"step_{num_steps}.png")
+            
             os.makedirs(os.path.dirname(png_save_path), exist_ok=True)
             png_bytes = await env.page.screenshot()
             with open(png_save_path, "wb") as png_file:
@@ -528,6 +570,11 @@ async def run_task(
         for _ in range(3):
             response_total_count += 1
             try:
+                # Use rag_cache_dir from parameter, or get from config as fallback
+                if rag_cache_dir is None and rag_enabled and rag_mode == "vision_rag":
+                    # Fallback to config if not provided as parameter
+                    rag_cache_dir = config.get("rag", {}).get("cache_dir", "rag_cache")
+                
                 out_put = await Planning.plan(
                     config=config,
                     user_request=task_name,
@@ -539,7 +586,10 @@ async def run_task(
                     observation_VforD=observation_VforD,
                     status_description=status_description,
                     rag_enabled=rag_enabled,
-                    rag_path=rag_path
+                    rag_path=rag_path,
+                    rag_log_dir=rag_log_dir,
+                    rag_mode=rag_mode,
+                    rag_cache_dir=rag_cache_dir
                 )
 
                 if out_put is not None:
@@ -572,6 +622,15 @@ async def run_task(
             logger.info(f"-- Action: {execute_action}")
             logger.info(f"-- Selector: {selector}")
             logger.info(f"-- Element value: {element_value}")
+            
+            # collect thoughts for DOM mode judgment
+            if dom_completion_manager and out_put:
+                dom_completion_manager.increment_step()
+                current_thought = out_put.get("planning_response", {}).get("thought", "")
+                if current_thought:
+                    recent_thoughts.append(current_thought)
+                    if len(recent_thoughts) > 10:
+                        recent_thoughts = recent_thoughts[-10:]
 
             logger.info(
                 "**🤖 The agent is in the process of starting evaluation 🤖**")
@@ -618,6 +677,56 @@ async def run_task(
 
                 if total_step_score == len(reference_evaluate_steps) and len(reference_evaluate_steps) > 0:
                     task_finished = True
+            else:
+                each_step_dict["score"] = "0 / 0"
+                each_step_dict["match_func_result"] = "N/A"
+                each_step_dict["step_reward"] = {}
+
+            if dom_completion_manager and mode == "dom":
+                current_screenshot = None
+                judgment_result = None
+
+                if dom_end_judge and await dom_end_judge.should_judge_now(num_steps + 1, task_name):
+                    try:
+                        if "vision" in global_reward_mode and vision_reward:
+                            current_screenshot = vision_reward
+                        else:
+                            current_screenshot = await env.capture()
+                        
+                        previous_actions_summary = ""
+                        if previous_trace:
+                            recent_traces = previous_trace[-5:]
+                            previous_actions_summary = "Recent actions:\n"
+                            for i, trace in enumerate(recent_traces):
+                                action_type = trace.get("action", "unknown")
+                                previous_actions_summary += f"Step {i+1}: {action_type}\n"
+                        
+                        should_stop_task, judgment_result = await dom_end_judge.judge_completion_and_errors(
+                            task_description=task_name,
+                            screenshot_base64=current_screenshot,
+                            previous_actions=previous_actions_summary,
+                            current_step=num_steps + 1
+                        )
+                        
+                    except Exception as end_judge_error:
+                        logger.warning(f"⚠️  DOM End judge evaluation failed: {end_judge_error}")
+                
+                dom_completed = dom_completion_manager.check_dom_mode_completion(
+                    step_reward=step_reward,
+                    judgment_result=judgment_result,
+                    user_request=task_name,
+                    recent_thoughts=recent_thoughts
+                )
+                
+                if dom_completed:
+                    logger.info("🏆 DOM mode task completion detected!")
+                    task_finished = True
+                    completion_summary = dom_completion_manager.get_completion_summary()
+                    logger.info(f"📊 DOM Completion Summary: {completion_summary.get('completion_reason', 'Unknown')}")
+                    
+                    each_step_dict["dom_completion_summary"] = completion_summary
+                    if judgment_result:
+                        each_step_dict["end_judge_result"] = judgment_result
 
             logger.info(
                 "**🤖 The agent is in the process of executing the action 🤖**")
@@ -634,10 +743,13 @@ async def run_task(
                     f"ActionExecutionError occurred: {error_message}")
                 error_description = error_message
 
-            if mode in ["d_v", "dom_v_desc", "vision_to_dom"]:
+            if mode in ["d_v", "dom_v_desc", "vision_to_dom", "dom"]:
                 observation, observation_VforD = await env.get_obs()
-                save_screenshot(mode=mode, record_time=record_time, task_name=task_name,
-                                step_number=num_steps, description="obs", screenshot_base64=observation_VforD)
+                disable_duplicates = config.get('basic', {}).get('disable_duplicate_screenshots', False)
+                if not disable_duplicates:
+                    save_screenshot(mode=mode, record_time=record_time, task_name=task_name,
+                                    step_number=num_steps, description="obs", screenshot_base64=observation_VforD,
+                                    file_path=screenshot_params["file_path"] if screenshot_params else None)
             else:
                 observation = await env.get_obs()
 
@@ -652,9 +764,12 @@ async def run_task(
 
             if "vision" in global_reward_mode:
                 vision_reward = await env.capture()
-                save_screenshot(mode=mode, record_time=record_time, task_name=task_name,
-                                step_number=num_steps, description="reward",
-                                screenshot_base64=vision_reward, task_uuid=task_uuid)
+                disable_duplicates = config.get('basic', {}).get('disable_duplicate_screenshots', False)
+                if not disable_duplicates:
+                    save_screenshot(mode=mode, record_time=record_time, task_name=task_name,
+                                    step_number=num_steps, description="reward",
+                                    screenshot_base64=vision_reward, task_uuid=task_uuid,
+                                    file_path=screenshot_params["file_path"] if screenshot_params else None)
                 is_valid, message = is_valid_base64(vision_reward)
                 if not is_valid:
                     invalid_vision_reward_num += 1
@@ -671,13 +786,14 @@ async def run_task(
             additional_steps += step_increase
             steps_list.append(each_step_dict)
             step_index += 1
-            if num_steps >= 25 or task_global_status == "finished" or task_finished:
-                if num_steps >= 25:
-                    logger.info("**🤖 Breaking loop: Reached maximum step limit of 25 🤖**")
+            
+            if num_steps >= (max_steps + additional_steps) or task_global_status == "finished" or task_finished:
+                if num_steps >= (max_steps + additional_steps):
+                    logger.info(f"**🤖 Breaking loop: Reached maximum step limit of {max_steps + additional_steps} 🤖**")
                 elif task_global_status == "finished":
                     logger.info("**🤖 Breaking loop: Global reward status indicates task is finished 🤖**")
                 elif task_finished:
-                    logger.info("**🤖 Breaking loop: All evaluation steps matched successfully 🤖**")
+                    logger.info("**🤖 Breaking loop: DOM mode task completion detected 🤖**")
                 break
         num_steps += 1
         if interaction_mode:
@@ -750,26 +866,26 @@ async def run_task(
             len(reference_evaluate_steps), total_step_score)
         logger.info(f"Finish task score: {finish_task_score}")
 
-        # Save the status of the task
-        if task_finished:
-            task_result["status"] = "finished"
-        elif task_global_status == "finished":
-            task_result["status"] = "llm_finished"
-        elif human_interaction_stop_status:
-            task_result["status"] = "early_stop"
-        else:
-            task_result["status"] = "step_limit"
+    # Save the status of the task
+    if task_finished:
+        task_result["status"] = "finished"
+    elif task_global_status == "finished":
+        task_result["status"] = "llm_finished"
+    elif human_interaction_stop_status:
+        task_result["status"] = "early_stop"
+    else:
+        task_result["status"] = "step_limit"
 
-        task_result["LLM_error_rate"] = str(
-            response_error_count / response_total_count)
-        task_result["step_list"] = steps_list
-        task_result["evaluate_steps"] = reference_evaluate_steps
+    task_result["LLM_error_rate"] = str(
+        response_error_count / response_total_count)
+    task_result["step_list"] = steps_list
+    task_result["evaluate_steps"] = reference_evaluate_steps
 
-        json_result_folder = write_result_file_path
-        if not os.path.exists(json_result_folder):
-            os.makedirs(json_result_folder)
-        json_out_file_path = os.path.join(
-            json_result_folder, str(task_index) + "_" + str(task_result["id"]) + ".json")
-        logger.info(f"Write results to json file: {json_out_file_path}")
-        with open(json_out_file_path, 'w') as json_file:
-            json.dump(task_result, json_file)
+    json_result_folder = write_result_file_path
+    if not os.path.exists(json_result_folder):
+        os.makedirs(json_result_folder)
+    json_out_file_path = os.path.join(
+        json_result_folder, str(task_index) + "_" + str(task_result["id"]) + ".json")
+    logger.info(f"Write results to json file: {json_out_file_path}")
+    with open(json_out_file_path, 'w') as json_file:
+        json.dump(task_result, json_file)

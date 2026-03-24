@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+# ---------------------------------------------------------------------------
+# Project metadata
+# ---------------------------------------------------------------------------
+[project]
+name = "webragent"
+version = "2.0.0"
+description = "A RAG-enhanced web agent framework for automated browser interaction and evaluation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["web-agent", "rag", "playwright", "llm", "automation"]
+
+dependencies = [
+    "playwright>=1.32",
+    "openai>=1.0",
+    "anthropic>=0.50",
+    "google-generativeai>=0.8",
+    "chromadb>=1.0",
+    "toml>=0.10",
+    "jinja2>=3.0",
+    "json5>=0.9",
+    "tenacity>=8.0",
+    "pillow>=10.0",
+    "tiktoken>=0.5",
+    "colorlog>=6.0",
+]
+
+# ---------------------------------------------------------------------------
+# Optional dependency groups
+# ---------------------------------------------------------------------------
+[project.optional-dependencies]
+vision = [
+    "torch>=2.0",
+    "transformers>=4.40",
+    "timm>=1.0",
+]
+dev = [
+    "ruff",
+    "pytest",
+    "pytest-asyncio",
+    "mypy",
+]
+
+# ---------------------------------------------------------------------------
+# Ruff linter / formatter
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["webragent", "evaluate"]
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+# ---------------------------------------------------------------------------
+# Package discovery
+# ---------------------------------------------------------------------------
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["webragent*", "evaluate*"]

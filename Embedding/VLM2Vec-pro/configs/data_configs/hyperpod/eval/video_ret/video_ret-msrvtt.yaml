@@ -1,0 +1,10 @@
+MSR-VTT:
+    dataset_parser: "msrvtt"
+    dataset_name: "MSR-VTT"
+    dataset_split: "test"
+    video_root: "/fsx/home/ruimeng/data/MMEB_Pro/videos/video_ret/MSR-VTT/"
+    frame_root: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_ret/MSR-VTT/"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]

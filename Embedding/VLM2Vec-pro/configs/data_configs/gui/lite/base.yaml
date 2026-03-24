@@ -1,0 +1,44 @@
+WebArena:
+    dataset_parser: gui
+    dataset_name: /data/embedding/GAE-Bench-lite
+    subset_name: original
+    dataset_split: WebArena
+    image_dir: /data/embedding/GAE-Bench/images
+    num_sample_per_subset: null
+    weight: 1
+
+AutoWebGLM:
+    dataset_parser: gui
+    dataset_name: /data/embedding/GAE-Bench-lite
+    subset_name: original
+    dataset_split: AutoWebGLM
+    image_dir: /data/embedding/GAE-Bench/images
+    num_sample_per_subset: null
+    weight: 1
+
+Mind2Web:
+    dataset_parser: gui
+    dataset_name: /data/embedding/GAE-Bench-lite
+    subset_name: original
+    dataset_split: Mind2Web
+    image_dir: /data/embedding/GAE-Bench/images
+    num_sample_per_subset: null
+    weight: 1
+
+GUIAct:
+    dataset_parser: gui
+    dataset_name: /data/embedding/GAE-Bench-lite
+    subset_name: original
+    dataset_split: GUIAct
+    image_dir: /data/embedding/GAE-Bench/images
+    num_sample_per_subset: null
+    weight: 1
+
+WebLINX:
+    dataset_parser: gui
+    dataset_name: /data/embedding/GAE-Bench-lite
+    subset_name: original
+    dataset_split: WebLINX
+    image_dir: /data/embedding/GAE-Bench/images
+    num_sample_per_subset: null
+    weight: 1

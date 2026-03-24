@@ -1,0 +1,17 @@
+QVHighlight:
+    dataset_parser: moment_retrieval
+    dataset_name: QVHighlight
+    dataset_split: train
+    data_path: /fsx/home/ruimeng/data/MMEB_Pro/data/qvhighlight.jsonl
+    video_dir:
+    clip_dir:
+    frame_dir: /fsx/home/ruimeng/data/MMEB_Pro/frames/video_mret/qvhighlight/
+    num_negative_clips: 9
+    max_video_frames_saved: 64
+    max_clip_frames_saved: 8
+    num_video_frames: 8
+    num_clip_frames: 8
+    metrics:
+        - precision
+        - recall
+        - ndcg

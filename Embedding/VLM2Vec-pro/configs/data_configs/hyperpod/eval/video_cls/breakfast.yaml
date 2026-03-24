@@ -1,0 +1,10 @@
+Breakfast:
+    dataset_parser: "video_classification"
+    dataset_name: "breakfast"
+    dataset_split: "validation"
+    data_path: "/fsx/home/ruimeng/data/MMEB_Pro/data/breakfast.jsonl"
+    video_dir: ""
+    frame_dir: "/fsx/home/ruimeng/data/MMEB_Pro/frames/video_cls/Breakfast"
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]

@@ -10,6 +10,7 @@ from agent.Environment.html_env.async_env import AsyncHTMLEnvironment
 from evaluate import *
 from agent.Plan import *
 from dataclasses import dataclass
+from typing import Optional, List, Dict, Any
 
 import re
 import asyncio
@@ -36,14 +37,21 @@ class ExperimentConfig:
     global_reward_text_model: str
     ground_truth_mode: bool
     single_task_name: str
-    config: dict
-    ground_truth_data: dict
+    config: Dict[str, Any]
+    ground_truth_data: Optional[Dict[str, Any]]
     write_result_file_path: str
     record_time: str
-    file: list
+    file: Optional[List[Any]]
     rag_enabled: bool
     rag_path: str
-
+    rag_log_dir: Optional[str] = None
+    end_judge_mode: str = "disabled"
+    end_judge_confidence_threshold: float = 0.8
+    end_judge_min_steps: int = 2
+    consecutive_error_threshold: int = 2
+    rag_mode: str = "description"
+    rag_cache_dir: Optional[str] = None
+    
 def validate_config(config, observation_mode, global_reward_mode, observation_model, global_reward_model):
     task_mode = config['basic']['task_mode']
     batch_tasks_file_path = config['files']['batch_tasks_file_path']
@@ -205,7 +213,14 @@ async def run_experiment(task_range, experiment_config):
                        screenshot_params=screenshot_params, # support screenshot
                        website=website, # Specified web page
                        rag_enabled=experiment_config.rag_enabled,
-                       rag_path=experiment_config.rag_path
+                       rag_path=experiment_config.rag_path,
+                       rag_log_dir=experiment_config.rag_log_dir,
+                       end_judge_mode=experiment_config.end_judge_mode,
+                       end_judge_confidence_threshold=experiment_config.end_judge_confidence_threshold,
+                       end_judge_min_steps=experiment_config.end_judge_min_steps,
+                       consecutive_error_threshold=experiment_config.consecutive_error_threshold,
+                       rag_mode=experiment_config.rag_mode,
+                       rag_cache_dir=experiment_config.rag_cache_dir
                        )
 
         await env.close()
@@ -228,7 +243,14 @@ async def main(global_reward_mode="no_global_reward",
                raw_data_index=-1,
                observation_mode="dom",
                ground_truth_mode=False,
-               toml_path=None
+               toml_path=None,
+               rag_log_dir=None,
+               end_judge_mode="disabled",
+               end_judge_confidence_threshold=0.8,
+               end_judge_min_steps=2,
+               consecutive_error_threshold=2,
+               rag_mode="description",
+               rag_cache_dir=None
                ):
     config = read_config(toml_path)
     config['single_task_website'] = single_task_website
@@ -264,6 +286,13 @@ async def main(global_reward_mode="no_global_reward",
         file=file,
         rag_enabled=rag_enabled,
         rag_path=rag_path,
+        rag_log_dir=rag_log_dir,
+        end_judge_mode=end_judge_mode,
+        end_judge_confidence_threshold=end_judge_confidence_threshold,
+        end_judge_min_steps=end_judge_min_steps,
+        consecutive_error_threshold=consecutive_error_threshold,
+        rag_mode=rag_mode,
+        rag_cache_dir=rag_cache_dir
     )
 
     await run_experiment(task_range, experiment_config)
@@ -284,25 +313,85 @@ if __name__ == "__main__":
     parser.add_argument("--snapshot", type=str, default="results_o4")
     parser.add_argument("--planning_text_model", type=str, default="gpt-4o-mini")
     parser.add_argument("--global_reward_text_model", type=str, default="gpt-4o-mini")
-    
+    parser.add_argument("--rag_log_dir", type=str, default=None,
+                        help="RAG logger storage directory path (if not specified, RAG logging will be disabled)")
+    parser.add_argument("--end_judge", type=str, default="disabled",
+                        choices=["disabled", "enabled", "strict"],
+                        help="End judge mode: disabled (no end judge), enabled (standard completion criteria), strict (strict completion criteria)")
+    parser.add_argument("--end_judge_confidence_threshold", type=float, default=0.8,
+                        help="Confidence threshold for end judge completion (0.0-1.0)")
+    parser.add_argument("--end_judge_min_steps", type=int, default=2,
+                        help="Minimum steps before end judge starts evaluating")
+    parser.add_argument("--consecutive_error_threshold", type=int, default=2,
+                        help="Consecutive error threshold - how many consecutive errors to tolerate before stopping task")
+    parser.add_argument("--rag_mode", type=str, default="description",
+                        choices=["description", "vision", "vision_rag", "description_rag"],
+                        help="RAG mode: description (text-based), vision (visual examples), vision_rag (pure image retrieval), description_rag (embedding + description)")
+    parser.add_argument("--rag_cache_dir", type=str, default=None,
+                        help="RAG cache directory path for pre-built indices")
 
     args = parser.parse_args()
+
+    # asyncio.run(main(global_reward_mode=args.global_reward_mode,
+    #                  planning_text_model=args.planning_text_model,
+    #                  global_reward_text_model=args.global_reward_text_model,
+    #                  single_task_name=args.single_task_name,
+    #                  single_task_website=args.single_task_website,
+    #                  raw_data_index=args.index,
+    #                  rag_log_dir=args.rag_log_dir
+    #                  )
+    #             )
 
     asyncio.run(main(global_reward_mode=args.global_reward_mode,
                      planning_text_model=args.planning_text_model,
                      global_reward_text_model=args.global_reward_text_model,
                      single_task_name=args.single_task_name,
                      single_task_website=args.single_task_website,
-                     raw_data_index=args.index
+                     raw_data_index=args.index,
+                     rag_log_dir=args.rag_log_dir,
+                     end_judge_mode=args.end_judge,
+                     end_judge_confidence_threshold=args.end_judge_confidence_threshold,
+                     end_judge_min_steps=args.end_judge_min_steps,
+                     consecutive_error_threshold=args.consecutive_error_threshold,
+                     rag_mode=args.rag_mode,
+                     rag_cache_dir=args.rag_cache_dir
                      )
-                )
+    )
     
-# Example command to run the evaluation script
+# Example commands to run the evaluation script
+
+# 1. DOM mode with traditional description RAG
 # xvfb-run -a python eval.py \
+# --mode dom \
 # --global_reward_mode dom_reward \
 # --index -1 \
 # --single_task_name "View the cheapest apartment available for students at the University of Leeds with bills that include WIFI and cleaning services." \
 # --single_task_website "https://www.student.com/" \
 # --snapshot results_new/exp/ \
+# --planning_text_model gpt-4o-mini \
+# --global_reward_text_model gpt-4o-mini \
+# --rag_mode description
+
+# 2. DOM mode with new Vision RAG (DOMVisionRAGConstructor)
+# xvfb-run -a python eval.py \
+# --mode dom \
+# --global_reward_mode dom_reward \
+# --index -1 \
+# --single_task_name "Find information about latest MacBook Pro models and pricing" \
+# --single_task_website "https://www.apple.com/" \
+# --snapshot results_dom_vision_rag/exp/ \
+# --planning_text_model gpt-4o-mini \
+# --global_reward_text_model gpt-4o-mini \
+# --rag_mode vision_rag
+
+# 3. Operator mode with Vision RAG (for comparison)
+# xvfb-run -a python eval.py \
+# --mode operator \
+# --global_reward_mode dom_reward \
+# --index -1 \
+# --single_task_name "Find information about latest MacBook Pro models and pricing" \
+# --single_task_website "https://www.apple.com/" \
+# --snapshot results_operator_vision_rag/exp/ \
 # --planning_text_model computer-use-preview-2025-03-11 \
-# --global_reward_text_model gpt-4.1
+# --global_reward_text_model gpt-4.1 \
+# --rag_mode vision_rag

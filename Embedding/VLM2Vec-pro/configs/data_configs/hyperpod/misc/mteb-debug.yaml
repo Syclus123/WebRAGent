@@ -1,0 +1,56 @@
+colpali_train_set:
+    dataset_parser: vidore
+    dataset_name: vidore/colpali_train_set
+    weight: 1
+OK-VQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: OK-VQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    weight: 1
+ImageNet_1K:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: ImageNet_1K
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    weight: 1
+nq:
+    dataset_parser: beir
+    dataset_name: nq
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_nqtrain_train.jsonl
+    weight: 4
+    size: 132803
+berri:
+    dataset_parser: berri
+    dataset_name: berri
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/berri/tart_dual_train_data.jsonl
+    weight: 3
+    size: 5176910
+nfcorpus:
+    dataset_parser: beir
+    dataset_name: nfcorpus
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_nfcorpus_train.jsonl
+    weight: 1
+    size: 110575
+    hardneg_range: 0-50
+scifact:
+    dataset_parser: beir
+    dataset_name: scifact
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_scifact_train.jsonl
+    weight: 1
+    size: 920
+fiqa:
+    dataset_parser: beir
+    dataset_name: fiqa
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_fiqa_train.jsonl
+    weight: 1
+    size: 14166
+    posneg_margin: 0.05
+scifact-wizardlm2:
+    dataset_parser: beir
+    dataset_name: SciFact
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_scifact-all_wizardlm2.jsonl
+    weight: 1
+    size: 4900

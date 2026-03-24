@@ -1,0 +1,28 @@
+Video-MME:
+    dataset_parser: videomme
+    video_dir: 
+    frame_dir: /data/ruimeng/video_qa/Video-MME
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+NExTQA:
+    dataset_parser: nextqa
+    video_dir: 
+    frame_dir: /data/ruimeng/video_qa/NExTQA
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+egoschema:
+    dataset_parser: egoschema
+    video_dir: /fsx/home/ruimeng/data/lmms-lab/egoschema/videos
+    frame_dir: /data/ruimeng/video_qa/egoschema
+    max_frames_saved: 64
+    num_frames: 8
+    metrics: ["precision", "recall", "ndcg"]
+# MVBench:
+#     dataset_parser: mvbench
+#     video_dir: 
+#     frame_dir: /data/ruimeng/video_qa/MVBench
+#     max_frames_saved: 64
+#     num_frames: 4
+#     metrics: ["precision", "recall", "ndcg"]

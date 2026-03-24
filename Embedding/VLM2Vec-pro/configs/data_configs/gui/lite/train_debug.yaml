@@ -1,0 +1,17 @@
+WebArena:
+    dataset_parser: gui
+    dataset_name: /data/embedding/GAE-Bench-lite
+    subset_name: train
+    dataset_split: WebArena
+    image_dir: /data/embedding/GAE-Bench/images
+    num_sample_per_subset: null
+    weight: 1
+
+AutoWebGLM:
+    dataset_parser: gui
+    dataset_name: /data/embedding/GAE-Bench-lite
+    subset_name: train
+    dataset_split: AutoWebGLM
+    image_dir: /data/embedding/GAE-Bench/images
+    num_sample_per_subset: null
+    weight: 1

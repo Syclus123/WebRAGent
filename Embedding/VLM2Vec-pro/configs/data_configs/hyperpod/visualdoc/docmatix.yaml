@@ -1,0 +1,6 @@
+Docmatix:
+        dataset_parser: docmatix
+        dataset_name: HuggingFaceM4/Docmatix
+        global_dataset_name: Docmatix
+        config_name: images  # images, pdf, zero-shot-exp
+        weight: 1

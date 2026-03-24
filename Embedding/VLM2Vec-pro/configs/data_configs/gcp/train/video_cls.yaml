@@ -1,0 +1,47 @@
+HMDB51:
+    dataset_parser: "video_classification"
+    dataset_name: "HMDB51"
+    dataset_split: "train"
+    data_path: "VLM2Vec/HMDB51"
+    video_dir: "/home/mingyi/mmeb_v2_raw_videos/HMDB51/videos_sta"
+    frame_dir: "/data/ziyan/VLM2Vec_Train/video_cls/HMDB51"
+    eval_num_sample_per_subset: 10000
+    max_frames_saved: 64
+    num_frames: 8
+    weight: 1
+
+UCF101:
+    dataset_parser: "video_classification"
+    dataset_name: "UCF101"
+    dataset_split: "train"
+    data_path: "VLM2Vec/UCF101"
+    video_dir: "/home/mingyi/mmeb_v2_raw_videos/UCF101/videos"
+    frame_dir: "/data/ziyan/VLM2Vec_Train/video_cls/UCF101"
+    eval_num_sample_per_subset: 30000
+    max_frames_saved: 64
+    num_frames: 8
+    weight: 1
+
+SmthSmthV2:
+    dataset_parser: "ssv2"
+    dataset_name: "SmthSmthV2"
+    dataset_split: "train"
+    data_path: "VLM2Vec/SmthSmthV2"
+    video_dir: "/home/mingyi/mmeb_v2_raw_videos/SSv2/videos"
+    frame_dir: "/data/ziyan/VLM2Vec_Train/video_cls/SSv2"
+    eval_num_sample_per_subset: 100000
+    max_frames_saved: 64
+    num_frames: 8
+    weight: 1
+
+K700:
+    dataset_parser: "video_classification"
+    dataset_name: "Kinetics-700"
+    dataset_split: "train"
+    data_path: "VLM2Vec/Kinetics-700"
+    video_dir: "/home/mingyi/mmeb_v2_raw_videos/K700/videos"
+    frame_dir: "/data/ziyan/VLM2Vec_Train/video_cls/K700"
+    eval_num_sample_per_subset: 100000
+    max_frames_saved: 64
+    num_frames: 8
+    weight: 1

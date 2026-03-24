@@ -1,0 +1,4 @@
+export PYTHONPATH=../VLM2Vec/:$PYTHONPATH
+export LD_LIBRARY_PATH=/fsx/home/xyang/embed-env/bin/python:/usr/local/cuda-12.1/targets/x86_64-linux/include/:/fsx/home/ruimeng/.local/lib/python3.10/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
+
+CUDA_VISIBLE_DEVICES=1 torchrun --nproc_per_node=1 --master_port=2211 --max_restarts=0 eval.py --model_name TIGER-Lab/VLM2Vec-Full --image_dir /fsx/sfr/data/MMEB/MMEB_test/MMEB_Test_1K_New/images/ --encode_output_path /fsx/home/ruimeng/runs/test/hf-VLM2Vec-Full --num_crops 4 --max_len 256 --pooling eos --normalize True --dataset_name TIGER-Lab/MMEB-eval --subset_name N24News ImageNet-A ImageNet-R WebQA --dataset_split test --per_device_eval_batch_size 8

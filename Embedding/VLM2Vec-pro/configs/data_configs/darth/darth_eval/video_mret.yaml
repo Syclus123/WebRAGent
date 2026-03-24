@@ -1,0 +1,46 @@
+QVHighlight:
+    dataset_parser: moment_retrieval
+    dataset_name: QVHighlight
+    num_sample_per_subset: None
+    video_root: None
+    clip_root: None
+    frame_root: /data/yuepeng/moment_retrieval/packed_frames/qvhighlight_frames
+    num_negative_clips: 9
+    max_video_frames_saved: 64
+    max_clip_frames_saved: 8
+    num_video_frames: 8
+    num_clip_frames: 8
+    eval_type: "local"
+    metrics: ["precision", "recall", "ndcg"]
+
+# Charades-sta:
+#     dataset_parser: moment_retrieval
+#     dataset_name: Charades-sta
+#     dataset_split: train
+#     data_path: /data/yuepeng/moment_retrieval/packed_frames/charades_sta.jsonl
+#     video_dir:
+#     clip_dir:
+#     frame_dir: /data/yuepeng/moment_retrieval/packed_frames/charades_sta_frames
+#     num_negative_clips: 9
+#     max_video_frames_saved: 64
+#     max_clip_frames_saved: 8
+#     num_video_frames: 8
+#     num_clip_frames: 8
+#     metrics:
+#         - precision
+#         - recall
+#         - ndcg
+
+#MomentSeeker:
+#    dataset_parser: momentseeker
+#    dataset_name: MomentSeeker
+#    dataset_split: train
+#    eval_num_sample_per_subset: null
+#    data_path: /home/mingyi/sampled_video_frames/ms_with_input.jsonl
+#    frame_root: /home/mingyi/sampled_video_frames/momentseeker
+#    ms_root: /data/yuepeng/moment_retrieval/momentseeker
+#    num_negative_clips: 9
+#    num_video_frames: 8
+#    metrics:
+#        - multi-label recall
+#    image_resolution: low

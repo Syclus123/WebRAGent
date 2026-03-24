@@ -264,16 +264,16 @@ class AsyncHTMLEnvironment:
             tab_name = await self.page.title()
             dom_tree = self.tree.build_dom_tree()
             observation = f"current web tab name is \'{tab_name}\'\n" + dom_tree
-            if self.mode in ["d_v", "dom_v_desc", "vision_to_dom"]:
+            if self.mode in ["d_v", "dom_v_desc", "vision_to_dom", "dom"]:
                 observation_VforD = await self.capture()
         except Exception as e:
             logger.error(f"-- Failed to fetch html content,error occur {e}")
-        if self.mode in ["d_v", "dom_v_desc", "vision_to_dom"]:
+        if self.mode in ["d_v", "dom_v_desc", "vision_to_dom", "dom"]:
             is_valid, message = is_valid_base64(
                 observation_VforD)
             logger.info(
-                "Successfully fetch html content with observation_VforD:", message)
-        return (observation, observation_VforD) if self.mode in ["d_v", "dom_v_desc", "vision_to_dom"] else observation
+                f"Successfully fetch html content with observation_VforD: {message}")
+        return (observation, observation_VforD) if self.mode in ["d_v", "dom_v_desc", "vision_to_dom", "dom"] else observation
 
     async def reset(self, start_url: str = ""):
         await self.setup(start_url)

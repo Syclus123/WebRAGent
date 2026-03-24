@@ -1,0 +1,109 @@
+AutoWebGLM-ood:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ood"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "AutoWebGLM"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/autowebglm_mini.yaml"
+
+AutoWebGLM-ind:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ind"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "AutoWebGLM"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/autowebglm_mini.yaml"
+
+Mind2Web-ood:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ood"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "Mind2Web"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/mind2web_mini.yaml"
+
+Mind2Web-ind:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ind"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "Mind2Web"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/mind2web_mini.yaml"
+
+WebLINX-ood:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ood"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "WebLINX"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/weblinx_mini.yaml"
+
+WebLINX-ind:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ind"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "WebLINX"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/weblinx_mini.yaml"
+
+GUIAct-ood:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ood"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "GUIAct"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/guiact_mini.yaml"
+
+GUIAct-ind:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ind"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "GUIAct"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/guiact_mini.yaml"
+
+WebArena-ood:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ood"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "WebArena"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/webarena_mini.yaml"
+
+WebArena-ind:
+  dataset_parser: "gui"
+  dataset_name: "/data/embedding/GAE-Bench-lite"
+  subset_name: "ind"
+  image_dir: "/data/embedding/GAE-Bench/images"
+  dataset_split: "WebArena"
+  num_sample_per_subset: null
+  metrics: ["precision", "recall", "ndcg"]
+  k_values: [1, 5, 10]
+  candidate_config: "cand/webarena_mini.yaml"

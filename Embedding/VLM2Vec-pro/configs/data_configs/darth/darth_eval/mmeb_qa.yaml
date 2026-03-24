@@ -1,0 +1,79 @@
+OK-VQA:
+    dataset_parser: "mmeb_qa"
+    dataset_name: "OK-VQA"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+A-OKVQA:
+    dataset_parser: "mmeb_qa"
+    dataset_name: "A-OKVQA"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+DocVQA:
+    dataset_parser: "mmeb_qa"
+    dataset_name: "DocVQA"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+InfographicsVQA:
+    dataset_parser: "mmeb_qa"
+    dataset_name: "InfographicsVQA"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+ChartQA:
+    dataset_parser: "mmeb_qa"
+    dataset_name: "ChartQA"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+Visual7W:
+    dataset_parser: "mmeb_qa"
+    dataset_name: "Visual7W"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+ScienceQA:
+    dataset_parser: "mmeb_qa"
+    dataset_name: "ScienceQA"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+VizWiz:
+    dataset_parser: "mmeb_qa"
+    dataset_name: "VizWiz"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+GQA:
+    dataset_parser: "mmeb_qa"
+    dataset_name: "GQA"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]
+
+TextVQA:
+    dataset_parser: "mmeb_qa"
+    dataset_name: "TextVQA"
+    dataset_split: "test"
+    image_root: "/data/ziyan/MMEB"
+    eval_num_sample_per_subset: None
+    metrics: ["precision", "recall", "ndcg"]

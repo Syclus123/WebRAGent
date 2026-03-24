@@ -32,8 +32,10 @@ def get_task_workflow_description(task_id: str) -> str:
                 # Combine all steps into a single string
                 description = f"Task: {task['confirmed_task']}\nWebsite: {task['website']}\n\nSteps:\n"
                 for i, step in enumerate(task["steps"], 1):
-                    description += f"{i}. Observation: {step['observation']}\n"
-                    description += f"   Action: {step['action']}\n\n"
+                    observation = step.get('observation_description') or step.get('observation', 'N/A')
+                    action = step.get('action_description') or step.get('action', 'N/A')
+                    description += f"{i}. Observation: {observation}\n"
+                    description += f"   Action: {action}\n\n"
                 return description
         
         return f"No workflow description found for task ID: {task_id}"

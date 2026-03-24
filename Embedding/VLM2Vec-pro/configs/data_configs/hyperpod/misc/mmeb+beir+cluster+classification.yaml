@@ -1,0 +1,272 @@
+arxiv-cluster-s2s:
+    dataset_parser: mteb_cluster
+    dataset_name: arxiv
+    task_type: Clustering
+    data_format: s2s
+    prompt_name: ArxivClusteringS2S
+    weight: 5
+    size: 324325
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/clustering/arxiv_kaggle_filtered.jsonl
+    loss_type: inexample_contrastive
+    data_type: against_text
+arxiv-cluster-p2p:
+    dataset_parser: mteb_cluster
+    dataset_name: arxiv
+    task_type: Clustering
+    data_format: p2p
+    prompt_name: ArxivClusteringP2P
+    weight: 5
+    size: 324325
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/clustering/arxiv_kaggle_filtered.jsonl
+    loss_type: inexample_contrastive
+    data_type: against_text
+biorxiv-cluster-s2s:
+    dataset_parser: mteb_cluster
+    dataset_name: biorxiv
+    task_type: Clustering
+    data_format: s2s
+    prompt_name: BiorxivClusteringS2S
+    weight: 5
+    size: 324325
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/clustering/biorxiv_paperscraper_filtered_shuffled.jsonl
+    loss_type: inexample_contrastive
+    data_type: against_text
+biorxiv-cluster-p2p:
+    dataset_parser: mteb_cluster
+    dataset_name: biorxiv
+    task_type: Clustering
+    data_format: p2p
+    prompt_name: BiorxivClusteringP2P
+    weight: 5
+    size: 324325
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/clustering/biorxiv_paperscraper_filtered_shuffled.jsonl
+    loss_type: inexample_contrastive
+    data_type: against_text
+medrxiv-cluster-s2s:
+    dataset_parser: mteb_cluster
+    dataset_name: medrxiv
+    task_type: Clustering
+    data_format: s2s
+    prompt_name: MedrxivClusteringS2S
+    weight: 5
+    size: 67669
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/clustering/medrxiv_paperscraper_filtered_shuffled.jsonl
+    loss_type: inexample_contrastive
+    data_type: against_text
+medrxiv-cluster-p2p:
+    dataset_parser: mteb_cluster
+    dataset_name: medrxiv
+    task_type: Clustering
+    data_format: p2p
+    prompt_name: MedrxivClusteringP2P
+    weight: 5
+    size: 67669
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/clustering/medrxiv_paperscraper_filtered_shuffled.jsonl
+    loss_type: inexample_contrastive
+    data_type: against_text
+reddit-s2s:
+    dataset_parser: mteb_cluster
+    dataset_name: reddit
+    task_type: Clustering
+    data_format: s2s
+    prompt_name: RedditClustering
+    weight: 5
+    size: 2253803
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/clustering/reddit_st2021_mtebcateonly.jsonl
+    loss_type: inexample_contrastive
+    data_type: against_text
+reddit-p2p:
+    dataset_parser: mteb_cluster
+    dataset_name: reddit
+    task_type: Clustering
+    data_format: p2p
+    prompt_name: RedditClusteringP2P
+    weight: 5
+    size: 2253803
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/clustering/reddit_st2021_mtebcateonly.jsonl
+    loss_type: inexample_contrastive
+    data_type: against_text
+stackexchange-s2s:
+    dataset_parser: mteb_cluster
+    dataset_name: stackexchange
+    task_type: Clustering
+    data_format: s2s
+    prompt_name: StackExchangeClustering
+    weight: 5
+    size: 417048
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/clustering/stackexchange_mteb_valid.jsonl
+    loss_type: inexample_contrastive
+    data_type: against_text
+20newsgroups-s2s:
+    dataset_parser: mteb_cluster
+    dataset_name: 20newsgroups
+    task_type: Clustering
+    data_format: s2s
+    prompt_name: TwentyNewsgroupsClustering
+    weight: 15
+    size: 5926
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/clustering/20newsgroups_contemmcm_filtered.jsonl
+    loss_type: inexample_contrastive
+    data_type: against_text
+EmotionClassification-text:
+    dataset_name: EmotionClassification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/EmotionClassification_train.jsonl
+    weight: 2.5
+    size: 16000
+    loss_type: inexample_contrastive
+    data_type: against_text
+ToxicConversationsClassification-text:
+    dataset_name: ToxicConversationsClassification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/ToxicConversationsClassification_train.jsonl
+    weight: 2.5
+    size: 50000
+    loss_type: inexample_contrastive
+    data_type: against_text
+TweetSentimentExtractionClassification-text:
+    dataset_name: TweetSentimentExtractionClassification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/TweetSentimentExtractionClassification_train.jsonl
+    weight: 2.5
+    size: 27481
+    loss_type: inexample_contrastive
+    data_type: against_text
+AmazonCounterfactualClassification-text:
+    dataset_name: AmazonCounterfactualClassification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/AmazonCounterfactualClassification_train.jsonl
+    weight: 2.5
+    size: 4018
+    loss_type: inexample_contrastive
+    data_type: against_text
+MassiveScenarioClassification-text:
+    dataset_name: MassiveScenarioClassification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/MassiveScenarioClassification_train.jsonl
+    weight: 2.5
+    size: 11514
+    loss_type: inexample_contrastive
+    data_type: against_text
+MTOPIntentClassification-text:
+    dataset_name: MTOPIntentClassification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/MTOPIntentClassification_train.jsonl
+    weight: 2.5
+    size: 15667
+    loss_type: inexample_contrastive
+    data_type: against_text
+AmazonReviewsClassification-text:
+    dataset_name: AmazonReviewsClassification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/AmazonReviewsClassification_train.jsonl
+    weight: 2.5
+    size: 210000
+    loss_type: inexample_contrastive
+    data_type: against_text
+MassiveIntentClassification-text:
+    dataset_name: MassiveIntentClassification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/MassiveIntentClassification_train.jsonl
+    weight: 2.5
+    size: 11514
+    loss_type: inexample_contrastive
+    data_type: against_text
+MTOPDomainClassification-text:
+    dataset_name: MTOPDomainClassification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/MTOPDomainClassification_train.jsonl
+    weight: 2.5
+    size: 15667
+    loss_type: inexample_contrastive
+    data_type: against_text
+AmazonPolarityClassification-text:
+    dataset_name: AmazonPolarityClassification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/AmazonPolarityClassification_train.jsonl
+    weight: 2.5
+    size: 3600000
+    loss_type: inexample_contrastive
+    data_type: against_text
+Banking77Classification-text:
+    dataset_name: Banking77Classification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/Banking77Classification_train.jsonl
+    weight: 2.5
+    size: 10003
+    loss_type: inexample_contrastive
+    data_type: against_text
+ImdbClassification-text:
+    dataset_name: ImdbClassification
+    dataset_parser: mteb_training
+    task_type: Classification
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/classification_v2/ImdbClassification_train.jsonl
+    weight: 2.5
+    size: 25000
+    loss_type: inexample_contrastive
+    data_type: against_text
+sts12:
+    dataset_parser: mteb_training
+    dataset_name: sts12
+    task_type: sts
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/sts/mteb_sts12_train_v2.jsonl
+    weight: 10
+    size: 1665
+    loss_type: inexample_contrastive
+sts22:
+    dataset_parser: mteb_training
+    dataset_name: sts22
+    task_type: sts
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/sts/mteb_sts22_train_v2.jsonl
+    weight: 10
+    size: 732
+    loss_type: inexample_contrastive
+stsbenchmark:
+    dataset_parser: mteb_training
+    dataset_name: stsbenchmark
+    task_type: sts
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/sts/mteb_STSBenchmark_train_v2.jsonl
+    weight: 10
+    size: 4299
+    loss_type: inexample_contrastive
+scidocsreranking:
+    dataset_parser: mteb_training
+    task_type: Reranking
+    dataset_name: SciDocsRR
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/reranking/scidocs_train.jsonl
+    weight: 10
+    size: 3981
+    loss_type: inexample_contrastive
+StackoverflowDupquestionsReranking:
+    dataset_parser: mteb_training
+    task_type: Reranking
+    dataset_name: StackOverflowDupQuestions
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/reranking/stackoverflowdupquestions_train.jsonl
+    weight: 10
+    size: 19847
+    loss_type: inexample_contrastive
+sprintduplicate:
+    dataset_parser: mteb_training
+    task_type: PairClassification
+    dataset_name: SprintDuplicateQuestions
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/pair-classification/mteb_sprintduplicate_validation.jsonl
+    weight: 10
+    size: 1000
+twitterurlcorpus:
+    dataset_parser: mteb_training
+    task_type: PairClassification
+    dataset_name: TwitterURLCorpus
+    file_path: /fsx/sfr/data/xgen-embedding/data/finetune/mteb/mteb/pair-classification/mteb_twitter_url_train.jsonl
+    weight: 10
+    size: 55105

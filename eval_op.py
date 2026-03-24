@@ -13,6 +13,19 @@ from evaluate import *
 from agent.Plan import *
 from dataclasses import dataclass
 
+# Import TaskCompletionManager
+from agent.Utils.task_completion_manager import (
+    TaskCompletionManager, 
+    TaskCompletionConfig, 
+    create_task_completion_manager
+)
+
+# Import ConfirmationLoopDetector
+from agent.Utils.confirmation_loop_detector import CONFIRMATION_LOOP_DETECTOR
+
+# Import EndJudge
+from agent.Utils.end_judge import create_end_judge, EndJudge
+
 import re
 import asyncio
 import argparse
@@ -41,6 +54,7 @@ class ExperimentConfig:
     global_reward_text_model: str
     ground_truth_mode: bool
     single_task_name: str
+    single_task_id: str
     config: dict
     ground_truth_data: dict
     write_result_file_path: str
@@ -51,6 +65,14 @@ class ExperimentConfig:
     screenshot_base_dir: str
     rag_logging_enabled: bool
     rag_log_dir: str
+    rag_mode: str
+    prompt_logging_enabled: bool
+    prompt_log_dir: str
+    end_judge_mode: str
+    end_judge_confidence_threshold: float
+    end_judge_min_steps: int
+    rag_cache_dir: str
+    consecutive_error_threshold: int
 
 def validate_config(config, observation_mode, global_reward_mode, observation_model, global_reward_model):
     """
@@ -136,13 +158,12 @@ def load_ground_truth_data(config, ground_truth_mode):
 
 def create_html_environment(mode, screenshot_dir="screenshots_operator"):
     """
-    创建HTML环境，针对operator模式优化
+    create html environment for operator mode
     """
     if mode == "operator":
-        # 使用专门的OperatorEnvironment
         return OperatorEnvironment(
-            headless=True,  # 确保在服务器环境中使用无头模式
-            slow_mo=50,     # 修复：减少延迟时间，提高响应速度
+            headless=False,
+            slow_mo=500,
             viewport_width=1280,
             viewport_height=720,
             save_trace_enabled=True,
@@ -169,7 +190,10 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
                           reference_task_length, reference_evaluate_steps, 
                           screenshot_params, rag_enabled, rag_path, global_reward_mode="no_global_reward", 
                           global_reward_text_model="gpt-4o-mini", ground_truth_mode=False, ground_truth_data=None,
-                          rag_logging_enabled=False, rag_log_dir=None):
+                          rag_logging_enabled=False, rag_log_dir=None, rag_mode="description",
+                          prompt_logging_enabled=False, prompt_log_dir=None, end_judge_mode="disabled",
+                          end_judge_confidence_threshold=0.8, end_judge_min_steps=2, rag_cache_dir=None,
+                          consecutive_error_threshold=2):
     """
     运行operator任务 (支持DOM reward和智能停止)
     """
@@ -177,15 +201,38 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
     logger.info(f"📱 Model: {planning_text_model}")
     logger.info(f"🌐 Website: {website}")
     logger.info(f"🏆 Reward mode: {global_reward_mode}")
+    logger.info(f"🧠 RAG mode: {rag_mode}")
     logger.info(f"📝 RAG logging: {'Enabled' if rag_logging_enabled else 'Disabled'}")
+    logger.info(f"💬 Prompt logging: {'Enabled' if prompt_logging_enabled else 'Disabled'}")
+    if rag_cache_dir:
+        logger.info(f"🗄️  RAG cache directory: {rag_cache_dir}")
+    # debug
+    # logger.info(f"⚖️  End judge mode: {end_judge_mode}")
+    # if end_judge_mode != "disabled":
+    #     logger.info(f"🎯 End judge confidence threshold: {end_judge_confidence_threshold}")
+    #     logger.info(f"📊 End judge min steps: {end_judge_min_steps}")
     
-    # 初始化RAG Logger
+    # Prompt Logger
+    prompt_logger = None
+    if prompt_logging_enabled:
+        from agent.Utils.prompt_logger import PromptLogger
+        prompt_logger = PromptLogger(prompt_log_dir=prompt_log_dir)
+        actual_prompt_dir = prompt_logger.prompt_dir
+        logger.info(f"💬 Prompt logs will be saved to: {actual_prompt_dir}")
+    
+    # RAG Logger
     rag_logger = None
     if rag_logging_enabled:
-        from agent.Utils.rag_logger import RAGLogger
-        rag_logger = RAGLogger(rag_log_dir=rag_log_dir)
-        actual_rag_dir = rag_logger.rag_dir
-        logger.info(f"📂 RAG logs will be saved to: {actual_rag_dir}")
+        if rag_mode == "vision":
+            from agent.Utils.rag_logger import VisionRAGLogger
+            rag_logger = VisionRAGLogger(rag_log_dir=rag_log_dir)
+            actual_rag_dir = rag_logger.vision_rag_dir
+            logger.info(f"📂 Vision RAG logs will be saved to: {actual_rag_dir}")
+        else:
+            from agent.Utils.rag_logger import RAGLogger
+            rag_logger = RAGLogger(rag_log_dir=rag_log_dir)
+            actual_rag_dir = rag_logger.rag_dir
+            logger.info(f"📂 RAG logs will be saved to: {actual_rag_dir}")
     
     # 启动环境
     await env.start()
@@ -199,8 +246,14 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
         
         await env.navigate_to(website)
         
-        # 初始截图
-        current_screenshot = await env.take_screenshot("initial.png")
+        if any(domain in website.lower() for domain in ["flightaware", "student.com", "booking.com"]):
+            await asyncio.sleep(3)
+        else:
+            await asyncio.sleep(1)
+        
+        # 初始化截图变量
+        # current_screenshot = await env.take_screenshot("initial.png")
+        current_screenshot = ""
         
         from agent.LLM.llm_instance import create_llm_instance
         
@@ -213,32 +266,45 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
         from agent.Plan.planning import OperatorMode
         operator_mode = OperatorMode(text_model=operator_model)
         
-        # 任务执行循环(支持动态步数)
-        max_steps = config.get('steps', {}).get('operator_max_steps', 50)  # 增加最大步数限制
+        if rag_cache_dir:
+            config['rag_cache_dir'] = rag_cache_dir
+            logger.info(f"🗄️  RAG cache directory set: {rag_cache_dir}")
+        
+        max_steps = config.get('steps', {}).get('operator_max_steps',80)  # max steps
         logger.info(f"📊 Using dynamic step limit with maximum: {max_steps}")
         
-        step_count = 0
+        # task completion manager
+        completion_manager = create_task_completion_manager(
+            max_steps=max_steps,
+            loop_threshold=5,
+            low_performance_threshold=8
+        )
+        
+        # end judge
+        end_judge = create_end_judge(
+            mode=end_judge_mode,
+            model_name="gpt-4o",
+            confidence_threshold=end_judge_confidence_threshold,
+            min_steps=end_judge_min_steps,
+            consecutive_error_threshold=consecutive_error_threshold
+        )
+        # logger.info(f"⚖️  End judge initialized: {end_judge.is_enabled()}")
+        
         previous_trace = [] 
         feedback = ""
         status_description = f"Starting task: {task_name}"
         
         task_trace = []
         
-        # 添加状态跟踪，避免重复无效操作
+        # avoid repetitive ineffective operations
         consecutive_failed_scrolls = 0
         last_action_type = None
         
-        # DOM reward
-        task_finished = False
-        task_global_status = ""
-        total_reward_score = 0
-        consecutive_low_scores = 0  # 连续低分计数
-        
-        # 获取初始DOM观察
+        # get initial DOM observation
         if hasattr(env, 'get_obs'):
-            # 对于operator环境，需要模拟DOM观察
+            # for operator environment, need to simulate DOM observation
             try:
-                # 获取页面标题和URL作为基本观察信息
+                # get page title and URL as basic observation information
                 page_title = await env.page.title()
                 page_url = env.page.url
                 observation = f"current web tab name is '{page_title}'\nURL: {page_url}"
@@ -249,18 +315,29 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
         
         logger.info(f"🔄 Starting operator task loop with reward-based stopping...")
         
-        while step_count < max_steps:
-            logger.info(f"📸 Step {step_count + 1} (max: {max_steps})")
+        while True:
+            should_continue, stop_reason = completion_manager.should_continue()
+            if not should_continue:
+                logger.info(f"🛑 Task stopped: {stop_reason}")
+                break
             
-            # 每个步骤都保存截图（移除去重机制）
-            screenshot_filename = f"step_{step_count:03d}.png"
+            completion_manager.increment_step()
+            current_step = completion_manager.step_count
             
-            # 确保页面准备好进行截图
-            await ensure_page_ready_for_screenshot(env)
+            logger.info(f"📸 Step {current_step} (max: {max_steps})")
             
-            # 获取当前截图
+            screenshot_filename = f"step_{current_step-1:03d}.png"
+            
+            # await ensure_page_ready_for_screenshot(env)
+            
+            # Simplify page preparation logic
+            await asyncio.sleep(1)
+            
             current_screenshot = await env.take_screenshot(screenshot_filename)
             logger.info(f"📷 Screenshot taken: {screenshot_filename}")
+            
+            # 记录任务进度
+            completion_manager.log_progress()
             
             # DOM Reward评估 (在planning之前进行，基于previous trace)
             step_reward = {}
@@ -298,38 +375,13 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
                     )
                     
                     if step_reward:
-                        reward_score = int(step_reward.get("score", 0))
-                        reward_status = step_reward.get("status", "doing")
-                        total_reward_score += reward_score
-                        
-                        logger.info(f"🏆 Reward Score: {reward_score}/10")
-                        logger.info(f"📊 Status: {reward_status}")
-                        logger.info(f"💭 Reason: {step_reward.get('reason', 'No reason provided')}")
-                        
-                        # 智能停止判断
-                        if reward_status == "finished" or reward_score == 10:
-                            logger.info("🎯 Task completed based on reward evaluation!")
-                            task_global_status = "finished"
-                            task_finished = True
+                        # 使用完成管理器检查奖励完成条件
+                        if completion_manager.check_reward_completion(step_reward):
                             break
-                        elif reward_status == "loop" or reward_score == 1:
-                            consecutive_low_scores += 1
-                            logger.warning(f"⚠️  Low score detected ({consecutive_low_scores}/3)")
-                            if consecutive_low_scores >= 5:
-                                logger.warning("🔄 Stopping due to consecutive low scores - task may be stuck")
-                                task_global_status = "loop"
-                                break
-                        elif reward_score <= 3:
-                            consecutive_low_scores += 1
-                            if consecutive_low_scores >= 8:
-                                logger.warning("🔄 Stopping due to persistent low performance")
-                                task_global_status = "low_performance"
-                                break
-                        else:
-                            consecutive_low_scores = 0  # 重置低分计数
                         
                         # 更新状态描述
-                        status_description = reward_description or f"Step {step_count + 1} - Score: {reward_score}"
+                        reward_score = int(step_reward.get("score", 0))
+                        status_description = reward_description or f"Step {current_step} - Score: {reward_score}"
                         
                 except Exception as e:
                     logger.error(f"❌ Error in reward evaluation: {e}")
@@ -342,6 +394,12 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
                 for i, trace in enumerate(previous_trace):
                     previous_trace_str += f"Step {i + 1}: {trace.get('thought', '')} -> {trace.get('action', '')}\n"
                 
+                planning_config = config.copy()
+                if rag_cache_dir:
+                    planning_config['rag_cache_dir'] = rag_cache_dir
+                    planning_config['task_uuid'] = task_uuid
+                    planning_config['step_idx'] = current_step - 1
+                
                 planning_response, error_message, planning_response_thought, planning_response_action, planning_token_count, rag_data = await operator_mode.execute(
                     status_description=status_description,
                     user_request=task_name,
@@ -350,7 +408,13 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
                     previous_trace=previous_trace_str,
                     observation="",  # operator模式不需要DOM观察
                     feedback=feedback,
-                    observation_VforD=current_screenshot
+                    observation_VforD=current_screenshot,
+                    rag_mode=rag_mode,
+                    prompt_logging_enabled=prompt_logging_enabled,
+                    prompt_logger=prompt_logger,
+                    task_uuid=task_uuid,
+                    step_idx=current_step - 1,
+                    rag_cache_dir=rag_cache_dir
                 )
                 
                 if error_message:
@@ -360,12 +424,100 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
                 logger.info(f"Step Thought: {planning_response_thought}")
                 logger.info(f"Step Action: {planning_response_action}")
                 
-                # RAG信息记录 (如果启用)
+                # 确认循环检测和干预 - 增强版本
+                try:
+                    recent_actions = [trace.get("action", {}) for trace in task_trace[-10:]] if task_trace else []
+                    recent_thoughts = [trace.get("thought", "") for trace in task_trace[-5:]] if task_trace else []
+                    
+                    # 立即检测当前思考是否寻求确认
+                    confirmation_detected = False
+                    if planning_response_thought and CONFIRMATION_LOOP_DETECTOR.detect_confirmation_seeking(planning_response_thought):
+                        logger.warning("🚨 IMMEDIATE CONFIRMATION SEEKING DETECTED!")
+                        logger.warning(f"Problematic thought: {planning_response_thought[:100]}...")
+                        confirmation_detected = True
+                        
+                        # 立即生成强烈的干预反馈
+                        immediate_feedback = f"""🚨 AUTONOMOUS EXECUTION REQUIRED! 🚨
+
+DETECTED FORBIDDEN CONFIRMATION SEEKING!
+
+Your thought: "{planning_response_thought[:150]}..."
+
+🚫 STOP ASKING FOR PERMISSION!
+✅ You are an AUTONOMOUS agent with FULL AUTHORITY
+✅ Execute actions IMMEDIATELY without asking
+✅ Find target elements and interact with them NOW
+✅ Complete the task directly
+
+CRITICAL: Your job is to EXECUTE, not to ask questions!
+TAKE ACTION NOW!"""
+                        
+                        feedback = immediate_feedback
+                    
+                    # detect information task completion
+                    info_task_completed = False
+                    if CONFIRMATION_LOOP_DETECTOR.detect_information_task_completion(
+                        user_request=task_name,
+                        recent_thoughts=recent_thoughts,
+                        current_thought=planning_response_thought
+                    ):
+                        logger.warning("🎯 INFORMATION TASK COMPLETION DETECTED!")
+                        logger.warning("Task should end with get_final_answer!")
+                        info_task_completed = True
+                        
+                        # generate completion intervention feedback
+                        completion_feedback = CONFIRMATION_LOOP_DETECTOR.generate_completion_intervention(
+                            user_request=task_name,
+                            detected_answer=planning_response_thought or "Complete information found"
+                        )
+                        
+                        feedback = completion_feedback
+                        
+                        # force generate get_final_answer action
+                        planning_response_action = {
+                            "action": "get_final_answer",
+                            "action_input": planning_response_thought or "Task completed - information found",
+                            "element_id": "info_task_completion"
+                        }
+                        logger.warning(f"🔄 FORCING TASK COMPLETION ACTION: get_final_answer")
+                    
+                    # analyze wait pattern
+                    wait_analysis = CONFIRMATION_LOOP_DETECTOR.analyze_wait_pattern(
+                        recent_actions=recent_actions, 
+                        recent_thoughts=recent_thoughts
+                    )
+                    
+                    logger.info(f"🔍 Wait Pattern Analysis: {wait_analysis.get('diagnosis', 'No diagnosis available')}")
+                    
+                    # if problem pattern detected, generate intervention feedback
+                    if wait_analysis.get("status") != "normal" and not confirmation_detected and not info_task_completed:
+                        intervention_feedback = CONFIRMATION_LOOP_DETECTOR.generate_intervention_feedback(
+                            wait_analysis, task_name, planning_response_thought or ""
+                        )
+                        
+                        if intervention_feedback:
+                            logger.warning(f"🚨 INTERVENTION: {wait_analysis.get('status', 'unknown')}")
+                            feedback = intervention_feedback
+                        
+                        # 对于严重情况，直接建议恢复操作
+                        if wait_analysis.get("status") in ["critical_wait_loop", "confirmation_loop"]:
+                            recovery_action = CONFIRMATION_LOOP_DETECTOR.suggest_recovery_action(
+                                wait_analysis, task_name
+                            )
+                            if recovery_action:
+                                logger.warning(f"🔄 FORCING RECOVERY ACTION: {recovery_action}")
+                                planning_response_action = recovery_action
+
+                except Exception as loop_detection_error:
+                    logger.warning(f"⚠️ Confirmation loop detection failed: {loop_detection_error}")
+                    # 继续执行，不影响主要任务流程
+                
+                # RAG logger
                 if rag_logging_enabled and rag_logger and rag_data:
                     try:
                         # 添加额外的步骤信息
                         rag_data.update({
-                            "step_idx": step_count,
+                            "step_idx": current_step - 1,  # 使用当前步数 
                             "task_name": task_name,
                             "website": website,
                             "model": planning_text_model,
@@ -379,8 +531,7 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
                             "screenshot_filename": screenshot_filename
                         })
                         
-                        # 记录RAG信息
-                        rag_file_path = rag_logger.log_rag_step(task_uuid, step_count, rag_data)
+                        rag_file_path = rag_logger.log_rag_step(task_uuid, current_step - 1, rag_data)
                         logger.info(f"📝 RAG information logged to: {rag_file_path}")
                         
                     except Exception as rag_error:
@@ -409,7 +560,7 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
                 
                 # 记录trace (包含reward信息)
                 trace_entry = {
-                    "step": step_count,
+                    "step": current_step - 1,  # 使用当前步数
                     "thought": planning_response_thought,
                     "action": planning_response_action,
                     "screenshot_taken": True, # 每个步骤都截图
@@ -427,64 +578,139 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
                     "reflection": step_reward.get("description", "") if step_reward else ""
                 }
                 
-                # 执行action
-                success = await execute_operator_action(env, planning_response_action)
+                # 验证和清理动作
+                validated_action, is_valid = await validate_and_sanitize_action(planning_response_action, env)
+                
+                if not is_valid:
+                    logger.warning("Action validation failed, using fallback")
+                    validated_action = {
+                        "action": "operator_wait",
+                        "action_input": "1000",
+                        "ms": 1000,
+                        "element_id": "validation_failed_fallback"
+                    }
+                
+                # 执行验证后的action
+                success = await execute_operator_action(env, validated_action)
                 
                 if not success:
                     logger.error("Action execution failed")
                     feedback = "Action execution failed. Please try a different approach or simpler actions."
                     current_trace["reflection"] += " (Action execution failed)"
+                    
+                    # 记录执行失败的详细信息
+                    logger.warning(f"Failed action details: {validated_action}")
+                    
+                    # 如果连续执行失败，可以考虑更保守的策略
+                    if consecutive_failed_scrolls >= 2:
+                        logger.warning("Multiple consecutive action failures detected, adding recovery pause")
+                        await asyncio.sleep(1.0)  # 短暂暂停，不记录为action
                 else:
                     feedback = ""
+                    consecutive_failed_scrolls = 0  # 重置失败计数
                 
                 # 添加到previous_trace用于下一轮reward评估
                 previous_trace.append(current_trace)
                 
-                # 检查是否完成
-                if planning_response_action.get("action") == "get_final_answer":
-                    logger.info("✅ Task completed by final answer!")
-                    task_finished = True
+                # detect information task completion (before action completion detection)
+                recent_thoughts = [trace.get("thought", "") for trace in task_trace[-10:]] if task_trace else []
+                if completion_manager.check_information_task_completion(
+                    user_request=task_name,
+                    recent_thoughts=recent_thoughts,
+                    current_thought=planning_response_thought
+                ):
+                    logger.info("🎯 Information task completion detected - ending task")
                     break
                 
-                step_count += 1
+                # GPT-4o end judge detection
+                if await end_judge.should_judge_now(current_step, task_name):
+                    logger.info("⚖️  Performing GPT-4o end judge evaluation...")
+                    
+                    # build previous actions summary
+                    previous_actions_summary = ""
+                    if task_trace:
+                        recent_traces = task_trace[-5:]  # last 5 actions
+                        previous_actions_summary = "Recent actions:\n"
+                        for i, trace in enumerate(recent_traces):
+                            step_num = trace.get("step", i)
+                            thought = trace.get("thought", "")[:100]
+                            action = trace.get("action", {})
+                            action_type = action.get("action", "unknown")
+                            previous_actions_summary += f"Step {step_num}: {thought} -> {action_type}\n"
+                    
+                    # call GPT-4o to end judge and error detection
+                    try:
+                        should_stop_task, end_judge_result = await end_judge.judge_completion_and_errors(
+                            task_description=task_name,
+                            screenshot_base64=current_screenshot,
+                            previous_actions=previous_actions_summary,
+                            current_step=current_step
+                        )
+                        # record end judge result to trace
+                        if task_trace:
+                            task_trace[-1]["end_judge_result"] = end_judge_result
+                            
+                        if should_stop_task:
+                            if completion_manager.check_end_judge_completion(end_judge_result):
+                                error_type = end_judge_result.get("error_type", "none")
+                                if error_type != "none":
+                                    logger.warning(f"🛑 Task stopped due to critical error: {error_type}")
+                                else:
+                                    logger.info("🎯 GPT-4o End Judge determined task completion - ending task")
+                                break
+                    
+                    except Exception as end_judge_error:
+                        logger.warning(f"⚠️  End judge evaluation failed: {end_judge_error}")
+                
+                # check action completion condition
+                if completion_manager.check_action_completion(planning_response_action):
+                    break
                 
             except Exception as e:
                 logger.error(f"Error in planning step: {e}")
+                completion_manager.handle_planning_error(str(e))
                 feedback = f"Error in planning: {str(e)}"
                 break
         
-        # 计算最终状态
-        if task_finished:
-            final_status = "finished"
-        elif task_global_status == "finished":
-            final_status = "llm_finished"
-        elif task_global_status == "loop":
-            final_status = "loop_detected"
-        elif task_global_status == "low_performance":
-            final_status = "low_performance"
-        elif step_count >= max_steps:
-            final_status = "step_limit"
-        else:
-            final_status = "unknown"
+        # get completion summary
+        completion_summary = completion_manager.get_completion_summary()
+        
+        # RAG cache status
+        if hasattr(operator_mode, 'get_rag_cache_status'):
+            rag_cache_status = operator_mode.get_rag_cache_status()
+            logger.info(f"🎯 RAG Cache Status: {rag_cache_status['cache_count']} constructors cached for modes: {rag_cache_status['cached_modes']}")
         
         result_data = {
             "task_name": task_name,
             "task_uuid": task_uuid,
             "model": planning_text_model,
             "website": website,
-            "steps": step_count,
-            "max_steps": max_steps,
-            "final_status": final_status,
-            "task_global_status": task_global_status,
-            "total_reward_score": total_reward_score,
-            "average_reward_score": total_reward_score / max(1, step_count),
+            "steps": completion_summary["steps_taken"],
+            "max_steps": completion_summary["max_steps"],
+            "final_status": completion_summary["final_status"],
+            "completion_reason": completion_summary["completion_reason"],
+            "task_global_status": completion_summary["task_global_status"],
+            "total_reward_score": completion_summary["total_reward_score"],
+            "average_reward_score": completion_summary["average_reward_score"],
             "reward_mode": global_reward_mode,
             "trace": task_trace,
             "final_state": await env.get_current_state(),
-            "completed": task_finished or task_global_status == "finished",
+            "completed": completion_summary["completed"],
             "record_time": record_time,
-            "reward_based_stopping": global_reward_mode != 'no_global_reward'
+            "reward_based_stopping": global_reward_mode != 'no_global_reward',
+            "end_judge_mode": end_judge_mode,
+            "end_judge_enabled": end_judge.is_enabled(),
+            "final_result_response": ""  # will be extracted from end_judge result below
         }
+        
+        # extract final_result_response from end_judge result
+        if task_trace:
+            for trace in reversed(task_trace):
+                if "end_judge_result" in trace:
+                    end_judge_result = trace["end_judge_result"]
+                    if end_judge_result.get("final_result_response"):
+                        result_data["final_result_response"] = end_judge_result["final_result_response"]
+                        break
         
         result_file = os.path.join(write_result_file_path, f"{task_uuid}_{record_time}.json")
         os.makedirs(os.path.dirname(result_file), exist_ok=True)
@@ -493,14 +719,17 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
             json.dump(result_data, f, ensure_ascii=False, indent=2)
         
         logger.info(f"📝 Result saved to: {result_file}")
-        logger.info(f"🏆 Final Status: {final_status}")
-        logger.info(f"📊 Total Steps: {step_count}")
-        logger.info(f"🎯 Total Reward Score: {total_reward_score}")
-        if step_count > 0:
-            logger.info(f"📈 Average Reward Score: {total_reward_score / step_count:.2f}")
+        logger.info(f"🏆 Final Status: {completion_summary['final_status']}")
+        logger.info(f"📊 Total Steps: {completion_summary['steps_taken']}")
+        logger.info(f"🎯 Total Reward Score: {completion_summary['total_reward_score']}")
+        if completion_summary['steps_taken'] > 0:
+            logger.info(f"📈 Average Reward Score: {completion_summary['average_reward_score']:.2f}")
+        if completion_summary['completion_reason']:
+            logger.info(f"🔍 Completion Reason: {completion_summary['completion_reason']}")
         
     except Exception as navigation_error:
         logger.error(f"❌ Navigation failed: {navigation_error}")
+        completion_manager.handle_navigation_error(str(navigation_error))
         
         # 尝试恢复策略
         logger.info("🔄 Attempting recovery strategies...")
@@ -567,7 +796,10 @@ async def run_operator_task(env, task_name, task_uuid, website, config,
         operator_mode = OperatorMode(text_model=operator_model)
         
     finally:
-        # 关闭环境
+        # 可选：清理RAG缓存以节省内存（批处理任务）
+        # if hasattr(operator_mode, 'clear_rag_cache'):
+        #     operator_mode.clear_rag_cache()
+        
         await env.close()
 
 
@@ -585,21 +817,29 @@ async def execute_operator_action(env, action_dict):
         
         if action_type == "operator_click":
             coords = action_dict.get("coordinates", [0, 0])
-            logger.info(f"📍 Clicking at coordinates: {coords}")
-            action = OperatorActionFactory.create_click_action(coords[0], coords[1])
+            button = action_dict.get("button", "left")
+            logger.info(f"📍 Clicking at coordinates: {coords} with {button} button")
+            action = OperatorActionFactory.create_click_action(coords[0], coords[1], button)
             await env.execute_operator_actions([action])
             
-            # 点击后智能等待页面稳定
-            await wait_for_page_stability(env, expected_change=True)
+            # wait for page stability after click
+            # await wait_for_page_stability(env, expected_change=True)
+            
+            # Simplify page preparation logic
+            await asyncio.sleep(1.5)
             
         elif action_type == "operator_double_click":
             coords = action_dict.get("coordinates", [0, 0])
-            logger.info(f"📍 Double-clicking at coordinates: {coords}")
-            action = OperatorActionFactory.create_double_click_action(coords[0], coords[1])
+            button = action_dict.get("button", "left")
+            logger.info(f"📍 Double-clicking at coordinates: {coords} with {button} button")
+            action = OperatorActionFactory.create_double_click_action(coords[0], coords[1], button)
             await env.execute_operator_actions([action])
             
-            # 双击后智能等待页面稳定
-            await wait_for_page_stability(env, expected_change=True)
+            # wait for page stability after double click
+            # await wait_for_page_stability(env, expected_change=True)
+            
+            # Simplify page preparation logic
+            await asyncio.sleep(1.5)
             
         elif action_type == "operator_type":
             text = action_dict.get("text", "")
@@ -607,25 +847,28 @@ async def execute_operator_action(env, action_dict):
             action = OperatorActionFactory.create_type_action(text)
             await env.execute_operator_actions([action])
             
-            # 文本输入后短暂等待（不需要长时间等待）
+            # wait for a short time after text input (no need to wait for a long time)
             await asyncio.sleep(0.3)
             
         elif action_type == "operator_scroll":
             scroll_x = action_dict.get("scroll_x", 0)
             scroll_y = action_dict.get("scroll_y", 0)
             
-            # 修复：将过大的滚动量调整为合理范围
-            if abs(scroll_y) > 500:
-                scroll_y = 500 if scroll_y > 0 else -500
-            if abs(scroll_x) > 500:
-                scroll_x = 500 if scroll_x > 0 else -500
+            # fix: adjust the too large scroll amount to a reasonable range
+            if abs(scroll_y) > 700:
+                scroll_y = 700 if scroll_y > 0 else -700
+            if abs(scroll_x) > 700:
+                scroll_x = 700 if scroll_x > 0 else -700
                 
             logger.info(f"📜 Scrolling: x={scroll_x}, y={scroll_y}")
             action = OperatorActionFactory.create_scroll_action(scroll_x, scroll_y)
             await env.execute_operator_actions([action])
             
-            # 滚动后智能等待内容稳定
-            await wait_for_scroll_completion(env)
+            # wait for content stability after scroll
+            # await wait_for_scroll_completion(env)
+            
+            # Simplify page preparation logic
+            await asyncio.sleep(1)
             
         elif action_type == "operator_keypress":
             keys = action_dict.get("keys", [])
@@ -633,7 +876,7 @@ async def execute_operator_action(env, action_dict):
             action = OperatorActionFactory.create_keypress_action(keys)
             await env.execute_operator_actions([action])
             
-            # 按键后智能等待（某些按键可能触发页面变化）
+            # wait for page stability after keypress (some keys may trigger page change)
             if any(key.lower() in ['enter', 'return', 'tab'] for key in keys):
                 await wait_for_page_stability(env, expected_change=True, timeout=3000)
             else:
@@ -645,12 +888,10 @@ async def execute_operator_action(env, action_dict):
             action = OperatorActionFactory.create_drag_action(path)
             await env.execute_operator_actions([action])
             
-            # 拖拽后等待页面稳定
             await wait_for_page_stability(env, expected_change=True)
             
         elif action_type == "operator_wait":
             ms = action_dict.get("ms", 1000)
-            # 限制等待时间在合理范围内
             ms = min(ms, 5000)  # 最多等待5秒
             logger.info(f"⏳ Waiting for {ms}ms")
             action = OperatorActionFactory.create_wait_action(ms)
@@ -658,7 +899,6 @@ async def execute_operator_action(env, action_dict):
             
         elif action_type == "get_final_answer":
             logger.info(f"🎯 Task completion detected")
-            # 任务完成，不需要额外等待
             return True
             
         else:
@@ -694,6 +934,99 @@ async def execute_operator_action(env, action_dict):
     except Exception as e:
         logger.error(f"❌ Error executing operator action {action_type}: {e}")
         return False
+
+
+async def validate_and_sanitize_action(action_dict, env):
+    """
+    Validate and clean up operator actions to ensure the rationality of actions
+    
+    Args:
+        action_dict: Raw action dictionary
+        env: Environment
+        
+    Returns:
+        Tuple[Dict, bool]: Cleaned action dictionary, valid or not
+    """
+    try:
+        action_type = action_dict.get("action", "")
+        
+        # 检查基本动作类型
+        valid_actions = [
+            "operator_click", "operator_double_click", "operator_type", 
+            "operator_scroll", "operator_keypress", "operator_drag", 
+            "operator_wait", "get_final_answer"
+        ]
+        
+        if action_type not in valid_actions:
+            logger.warning(f"Invalid action type: {action_type}, converting to operator_wait")
+            return {
+                "action": "operator_wait",
+                "action_input": "1000",
+                "ms": 1000,
+                "element_id": "invalid_action_fallback"
+            }, True
+        
+        # 验证点击动作的坐标
+        if action_type in ["operator_click", "operator_double_click"]:
+            coords = action_dict.get("coordinates", [640, 360])
+            if not isinstance(coords, list) or len(coords) != 2:
+                coords = [640, 360]
+            
+            # 确保坐标在合理范围内
+            x, y = coords[0], coords[1]
+            # if x < 0 or x > 2560 or y < 0 or y > 1600:
+            if x < 0 or x > 1280 or y < 0 or y > 720:
+                logger.warning(f"Coordinates out of range: {coords}, using center")
+                coords = [640, 360]
+            
+            action_dict["coordinates"] = coords
+            action_dict["action_input"] = f"{coords[0]},{coords[1]}"
+        
+        # 验证滚动动作
+        elif action_type == "operator_scroll":
+            scroll_x = action_dict.get("scroll_x", 0)
+            scroll_y = action_dict.get("scroll_y", 0)
+            
+            # 限制滚动量在合理范围内
+            if abs(scroll_y) > 1000:
+                scroll_y = 700 if scroll_y > 0 else -700
+            if abs(scroll_x) > 1000:
+                scroll_x = 700 if scroll_x > 0 else -700
+            
+            action_dict["scroll_x"] = scroll_x
+            action_dict["scroll_y"] = scroll_y
+            action_dict["action_input"] = f"{scroll_x},{scroll_y}"
+        
+        # 验证文本输入动作
+        elif action_type == "operator_type":
+            text = action_dict.get("text", "")
+            if not text or len(text) > 500:  # 防止过长的文本输入
+                if len(text) > 500:
+                    text = text[:500]
+                    logger.warning("Text input truncated to 500 characters")
+                action_dict["text"] = text
+                action_dict["action_input"] = text
+        
+        # 验证等待动作
+        elif action_type == "operator_wait":
+            ms = action_dict.get("ms", 1000)
+            if ms < 100:
+                ms = 100
+            elif ms > 10000:  # 最多等待10秒
+                ms = 10000
+            action_dict["ms"] = ms
+            action_dict["action_input"] = str(ms)
+        
+        return action_dict, True
+        
+    except Exception as e:
+        logger.error(f"Error validating action: {e}")
+        return {
+            "action": "operator_wait",
+            "action_input": "1000", 
+            "ms": 1000,
+            "element_id": "validation_error_fallback"
+        }, True
 
 
 async def get_page_state(env):
@@ -745,7 +1078,7 @@ async def wait_for_page_stability(env, expected_change=False, timeout=5000):
         
         # 策略1：等待网络请求完成
         try:
-            await env.page.wait_for_load_state("networkidle", timeout=min(3000, timeout))
+            await env.page.wait_for_load_state("networkidle", timeout=min(5000, timeout))
             logger.info("✅ Network idle achieved")
             return
         except Exception:
@@ -813,7 +1146,7 @@ async def ensure_page_ready_for_screenshot(env):
     """确保页面已准备好进行截图"""
     try:
         # 等待渲染完成
-        await env.page.wait_for_timeout(500)
+        await env.page.wait_for_timeout(1000)
         
         # 检查是否有加载指示器
         try:
@@ -994,31 +1327,30 @@ def is_repetitive_action(current_action, last_action, consecutive_count):
     if current_action == last_action:
         # 某些操作连续执行可能是正常的（如滚动浏览内容）
         if current_action in ["operator_scroll"]:
-            return consecutive_count >= 2  # 滚动操作允许2次
+            return consecutive_count >= 3  # 滚动操作允许3次
         elif current_action in ["operator_click", "operator_type"]:
-            return consecutive_count >= 1  # 点击和输入操作不允许连续
+            return consecutive_count >= 2  # 点击和输入操作允许2次重试
         elif current_action in ["operator_wait"]:
-            return consecutive_count >= 0  # wait操作立即被视为重复
+            return consecutive_count >= 2  # wait操作允许2次重复
         else:
-            return consecutive_count >= 1
+            return consecutive_count >= 2
     
     return False
 
 
 async def suggest_alternative_action(env, failed_action_type, task_name):
     """
-    基于失败的操作类型和任务内容，建议替代操作
+    Based on the type of operation that failed and the task content, alternative actions are suggested
     
     Args:
-        env: 环境实例
-        failed_action_type: 失败的操作类型
-        task_name: 任务名称
+        env: Environment
+        failed_action_type: The type of operation that failed
+        task_name: Task name
         
     Returns:
-        dict: 建议的替代操作，如果没有建议则返回None
+        dict: Suggested alternative action, returning None if there is no suggestion
     """
     try:
-        # 分析页面当前状态
         page_info = await env.page.evaluate("""
             () => {
                 // 检查页面上的可交互元素
@@ -1045,20 +1377,20 @@ async def suggest_alternative_action(env, failed_action_type, task_name):
             }
         """)
         
-        # 基于失败的操作类型和页面状态建议替代方案
+        # Alternatives are suggested based on the type of operation that failed and the page status
         if failed_action_type == "operator_scroll":
-            # 滚动失败，尝试其他导航方式
+            # Scrolling fails; try another navigation
             if page_info["hasNavElements"]:
                 return {
                     "action": "operator_click", 
-                    "coordinates": [640, 100], # 点击导航区域
+                    "coordinates": [640, 100], # Click on the navigation area
                     "action_input": "640,100",
                     "element_id": "nav_alternative"
                 }
             elif page_info["hasClickableElements"]:
                 return {
                     "action": "operator_click",
-                    "coordinates": [640, 300], # 点击页面中部
+                    "coordinates": [640, 300], # Click on the middle of the page
                     "action_input": "640,300", 
                     "element_id": "click_alternative"
                 }
@@ -1120,7 +1452,40 @@ async def run_experiment(task_range, experiment_config):
             reference_task_length = experiment_config.config['steps']['single_task_action_step']
             reference_evaluate_steps = []
             website = experiment_config.config.get('single_task_website', "about:blank")
-            task_uuid = f"single_task_{int(time.time())}"
+            
+            # find task_id
+            task_uuid = experiment_config.single_task_id
+
+            if task_uuid:
+                logger.info(f"✅ use direct task_id: {task_uuid}")
+            else:
+                try:
+                    # load task mapping file
+                    base_dir = os.path.dirname(os.path.abspath(__file__))
+                    online_mind2web_path = os.path.join(base_dir, "data/Online-Mind2Web/Online_Mind2Web.json")
+                    
+                    if os.path.exists(online_mind2web_path):
+                        with open(online_mind2web_path, 'r', encoding='utf-8') as f:
+                            tasks_data = json.load(f)
+                        
+                        for task_data in tasks_data:
+                            if task_data.get("confirmed_task") == task_name:
+                                task_uuid = task_data.get("task_id")
+                                website = task_data.get("website", website)
+                                logger.info(f"✅ find task_id: {task_uuid}")
+                                logger.info(f"📝 task_name: {task_name}")
+                                logger.info(f"🌐 website: {website}")
+                                break
+                        
+                        if not task_uuid:
+                            logger.warning(f"⚠️  not foundtask_id: {task_name}")
+                            
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to load the task mapping file: {e}")
+
+                if not task_uuid:
+                    task_uuid = f"single_task_{int(time.time())}"
+                    logger.info(f"🔄 use temporary task_id: {task_uuid}")
             
             logger.info(f"task_name: {task_name}")
             logger.info(f"website: {website}")
@@ -1141,13 +1506,12 @@ async def run_experiment(task_range, experiment_config):
         else:
             base_screenshot_dir = os.path.join("results_operator", "img_screenshots")
         
-        # trajectory directory
-        safe_task_name = "".join(c for c in task_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
-        safe_task_name = safe_task_name.replace(' ', '_')[:50]  # long name limit length to avoid path too long
-        if not safe_task_name:
-            safe_task_name = f"task_{task_uuid}"
+        # trajectory directory - fix None check
+        if task_uuid and base_screenshot_dir:
+            task_screenshot_dir = os.path.join(base_screenshot_dir, task_uuid)
+        else:
+            task_screenshot_dir = base_screenshot_dir if base_screenshot_dir else "results_operator/img_screenshots"
         
-        task_screenshot_dir = os.path.join(base_screenshot_dir, safe_task_name)
         if not os.path.exists(task_screenshot_dir):
             os.makedirs(task_screenshot_dir, exist_ok=True)
         
@@ -1179,7 +1543,15 @@ async def run_experiment(task_range, experiment_config):
                 ground_truth_mode=experiment_config.ground_truth_mode,
                 ground_truth_data=experiment_config.ground_truth_data,
                 rag_logging_enabled=experiment_config.rag_logging_enabled,
-                rag_log_dir=experiment_config.rag_log_dir
+                rag_log_dir=experiment_config.rag_log_dir,
+                rag_mode=experiment_config.rag_mode,
+                prompt_logging_enabled=experiment_config.prompt_logging_enabled,
+                prompt_log_dir=experiment_config.prompt_log_dir,
+                end_judge_mode=experiment_config.end_judge_mode,
+                end_judge_confidence_threshold=experiment_config.end_judge_confidence_threshold,
+                end_judge_min_steps=experiment_config.end_judge_min_steps,
+                rag_cache_dir=experiment_config.rag_cache_dir if hasattr(experiment_config, 'rag_cache_dir') else None,
+                consecutive_error_threshold=experiment_config.consecutive_error_threshold if hasattr(experiment_config, 'consecutive_error_threshold') else 2
             )
         else:
             # Other modes use the original logic
@@ -1222,13 +1594,22 @@ async def main(global_reward_mode="no_global_reward",
                global_reward_text_model="gpt-4o-mini",
                single_task_name="",
                single_task_website="about:blank",
+               single_task_id=None,
                raw_data_index=-1,
                observation_mode="operator",
                ground_truth_mode=False,
                toml_path=None,
                screenshot_base_dir=None,
                rag_logging_enabled=False,
-               rag_log_dir=None
+               rag_log_dir=None,
+               rag_mode="description",
+               prompt_logging_enabled=False,
+               prompt_log_dir=None,
+               end_judge_mode="disabled",
+               end_judge_confidence_threshold=0.8,
+               end_judge_min_steps=2,
+               rag_cache_dir=None,
+               consecutive_error_threshold=2
                ):
     config = read_config(toml_path)
     config['single_task_website'] = single_task_website
@@ -1249,9 +1630,17 @@ async def main(global_reward_mode="no_global_reward",
     rag_enabled = config['rag']['enabled']
     rag_path = config['rag']['rag_path']
 
+    # Override: allow disabling RAG via CLI rag_mode=none
+    if rag_mode == "none":
+        rag_enabled = False
+
     # Set the RAG log directory
     if rag_log_dir is None:
         rag_log_dir = os.path.join(write_result_file_path, "rag_result")
+    
+    # Set the Prompt log directory
+    if prompt_log_dir is None:
+        prompt_log_dir = os.path.join(write_result_file_path, "prompt_result")
 
     experiment_config = ExperimentConfig(
         mode=observation_mode,
@@ -1260,16 +1649,25 @@ async def main(global_reward_mode="no_global_reward",
         global_reward_text_model=global_reward_text_model,
         ground_truth_mode=ground_truth_mode,
         single_task_name=single_task_name,
+        single_task_id=single_task_id or "",
         config=config,
-        ground_truth_data=ground_truth_data,
+        ground_truth_data=ground_truth_data or {},
         write_result_file_path=write_result_file_path,
         record_time=record_time,
-        file=file,
+        file=file or [],
         rag_enabled=rag_enabled,
         rag_path=rag_path,
-        screenshot_base_dir=screenshot_base_dir,
+        screenshot_base_dir=screenshot_base_dir or "",
         rag_logging_enabled=rag_logging_enabled,
-        rag_log_dir=rag_log_dir
+        rag_log_dir=rag_log_dir,
+        rag_mode=rag_mode,
+        prompt_logging_enabled=prompt_logging_enabled,
+        prompt_log_dir=prompt_log_dir,
+        end_judge_mode=end_judge_mode,
+        end_judge_confidence_threshold=end_judge_confidence_threshold,
+        end_judge_min_steps=end_judge_min_steps,
+        rag_cache_dir=rag_cache_dir or "",
+        consecutive_error_threshold=consecutive_error_threshold
     )
 
     await run_experiment(task_range, experiment_config)
@@ -1288,6 +1686,8 @@ if __name__ == "__main__":
                         default="Find Dota 2 game and add all DLC to cart in steam.")
     parser.add_argument("--single_task_website", type=str,
                         default="about:blank", help="Website URL for single task mode")
+    parser.add_argument("--single_task_id", type=str, default=None,
+                        help="Real task ID for single task mode")
     parser.add_argument("--snapshot", type=str, default="test/exp")
     parser.add_argument("--planning_text_model", type=str, default="computer-use-preview-2025-03-11")
     parser.add_argument("--global_reward_text_model", type=str, default="gpt-4o-mini")
@@ -1304,6 +1704,24 @@ if __name__ == "__main__":
                         help="Enable RAG logging for operator mode")
     parser.add_argument("--rag_log_dir", type=str, default=None,
                         help="Directory to store RAG logs (default: results_dir/rag_result)")
+    parser.add_argument("--rag_mode", type=str, default="description",
+                        choices=['description', 'vision', 'vision_rag', 'description_rag', 'none'],
+                        help='RAG mode: description (use text descriptions), vision (use visual examples), vision_rag (embedding-based real RAG with screenshot), description_rag (embedding-based retrieval with task descriptions), or none (disable RAG)')
+    parser.add_argument("--prompt_logging_enabled", action="store_true",
+                        help="Enable prompt logging for operator mode")
+    parser.add_argument("--prompt_log_dir", type=str, default=None,
+                        help="Directory to store prompt logs (default: results_dir/)")
+    parser.add_argument("--end_judge", type=str, default="disabled",
+                        choices=["disabled", "enabled", "strict"],
+                        help="End judge mode: disabled (no end judge), enabled (standard completion criteria), strict (strict completion criteria)")
+    parser.add_argument("--end_judge_confidence_threshold", type=float, default=0.8,
+                        help="Confidence threshold for end judge completion (0.0-1.0)")
+    parser.add_argument("--end_judge_min_steps", type=int, default=2,
+                        help="Minimum steps before end judge starts evaluating")
+    parser.add_argument("--consecutive_error_threshold", type=int, default=2,
+                        help="Consecutive error threshold - how many consecutive errors to tolerate before stopping task")
+    parser.add_argument("--rag_cache_dir", type=str, default=None,
+                        help="Directory to load pre-built RAG cache (for vision_rag mode)")
 
     args = parser.parse_args()
 
@@ -1312,12 +1730,21 @@ if __name__ == "__main__":
                      global_reward_text_model=args.global_reward_text_model,
                      single_task_name=args.single_task_name,
                      single_task_website=args.single_task_website,
+                     single_task_id=args.single_task_id,
                      raw_data_index=args.index,
                      observation_mode=args.observation_mode,
                      ground_truth_mode=args.ground_truth_mode,
                      toml_path=args.toml_path,
                      screenshot_base_dir=args.screenshot_base_dir,
                      rag_logging_enabled=args.rag_logging_enabled,
-                     rag_log_dir=args.rag_log_dir
+                     rag_log_dir=args.rag_log_dir,
+                     rag_mode=args.rag_mode,
+                     prompt_logging_enabled=args.prompt_logging_enabled,
+                     prompt_log_dir=args.prompt_log_dir,
+                     end_judge_mode=args.end_judge,
+                     end_judge_confidence_threshold=args.end_judge_confidence_threshold,
+                     end_judge_min_steps=args.end_judge_min_steps,
+                     rag_cache_dir=args.rag_cache_dir,
+                     consecutive_error_threshold=args.consecutive_error_threshold
                      )
-                ) 
+                )

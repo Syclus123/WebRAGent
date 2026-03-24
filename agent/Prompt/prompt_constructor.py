@@ -2,6 +2,9 @@ from ..Utils.utils import is_valid_base64
 import json5
 import base64
 import json
+import time
+import os
+import toml
 
 from .vision_to_dom_prompts import VisionToDomPrompts
 from .dom_vision_disc_prompts import DomVisionDiscPrompts
@@ -527,7 +530,7 @@ class PlanningPromptRetrievalConstructor(BasePromptConstructor):
         )
         
         # Log the retrieval results
-        from log_retrieved_tasks import log_retrieval
+        from agent.Utils.log_retrieved_tasks import log_retrieval
         log_retrieval(
             user_request=user_request,
             retrieved_tasks=retrieved_tasks,
@@ -587,7 +590,7 @@ class PlanningPromptRetrievalConstructor(BasePromptConstructor):
 class PlanningPromptVisionRetrievalConstructor(BasePromptConstructor):
     def __init__(self):
         super().__init__()
-        self.prompt_system = BasePrompts.planning_prompt_system
+        self.prompt_system = BasePrompts.planning_rag_prompt_system
         self.prompt_user = BasePrompts.planning_prompt_user
         self.max_image_dimension = 800  # Increased from 800 to 1200 based on analysis
 
@@ -683,7 +686,7 @@ class PlanningPromptVisionRetrievalConstructor(BasePromptConstructor):
         print(f"retrieved_image_paths: {retrieved_image_paths}")
         
         # Log the retrieval results
-        from log_retrieved_tasks import log_retrieval
+        from agent.Utils.log_retrieved_tasks import log_retrieval
         log_retrieval(
             user_request=user_request,
             retrieved_tasks=retrieved_tasks,
@@ -776,7 +779,7 @@ class PlanningPromptVisionRetrievalConstructor(BasePromptConstructor):
 class PlanningPromptDescriptionRetrievalConstructor(BasePromptConstructor):
     def __init__(self):
         super().__init__()
-        self.prompt_system = BasePrompts.planning_prompt_system
+        self.prompt_system = BasePrompts.planning_rag_prompt_system
         self.prompt_user = BasePrompts.planning_prompt_user
         self.reference = ""  # Initialize as empty string instead of None
 
@@ -870,8 +873,9 @@ class OperatorPromptConstructor(BasePromptConstructor):
     
     def __init__(self):
         super().__init__()
-        self.prompt_system = OperatorPrompts.operator_planning_system
-        self.prompt_user = OperatorPrompts.operator_planning_user
+        # autonomous prompt
+        self.prompt_system = OperatorPrompts.operator_autonomous_simple_system
+        self.prompt_user = OperatorPrompts.operator_autonomous_user_template
     
     def construct(
             self,
@@ -960,8 +964,9 @@ class OperatorPromptRAGConstructor(BasePromptConstructor):
     
     def __init__(self):
         super().__init__()
-        self.prompt_system = OperatorPrompts.operator_rag_system
-        self.prompt_user = OperatorPrompts.operator_planning_user
+        # autonomous rag prompt
+        self.prompt_system = OperatorPrompts.operator_autonomous_rag_system
+        self.prompt_user = OperatorPrompts.operator_autonomous_rag_user
     
     def construct(
             self,
@@ -1015,7 +1020,7 @@ class OperatorPromptRAGConstructor(BasePromptConstructor):
             )
             
             # Log retrieval results
-            from log_retrieved_tasks import log_retrieval
+            from agent.Utils.log_retrieved_tasks import log_retrieval
             log_retrieval(
                 user_request=user_request,
                 retrieved_tasks=retrieved_tasks,
@@ -1171,7 +1176,287 @@ class OperatorPromptRAGConstructor(BasePromptConstructor):
             print(f"Error stringifying thought and action: {e}")
             return str(input_list)
 
+# Operator prompt constructor with vision-based RAG support (rag_mode=Vision)
+class OperatorPromptVisionRetrievalConstructor(BasePromptConstructor):
+    """
+    Operator prompt constructor with vision-based RAG support
+    """
+    
+    def __init__(self):
+        super().__init__()
+        # self.prompt_system = OperatorPrompts.operator_rag_system
+        # self.prompt_user = OperatorPrompts.operator_planning_user
+        
+        # autonomous rag prompt
+        self.prompt_system = OperatorPrompts.operator_autonomous_rag_system
+        self.prompt_user = OperatorPrompts.operator_autonomous_rag_user
+        self.max_image_dimension = 800  # Maximum image dimension for scaling
+    
+    def scale_image(self, image_path: str) -> bytes:
+        """Scale down image while maintaining aspect ratio to reduce size."""
+        from PIL import Image
+        import io
+        
+        # Open and scale image
+        with Image.open(image_path) as img:
+            # Calculate new dimensions while maintaining aspect ratio
+            width, height = img.size
+            if width > height:
+                if width > self.max_image_dimension:
+                    new_width = self.max_image_dimension
+                    new_height = int(height * (self.max_image_dimension / width))
+                else:
+                    return self._image_to_bytes(img)
+            else:
+                if height > self.max_image_dimension:
+                    new_height = self.max_image_dimension
+                    new_width = int(width * (self.max_image_dimension / height))
+                else:
+                    return self._image_to_bytes(img)
+            
+            # Scale image
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            return self._image_to_bytes(img)
+    
+    def _image_to_bytes(self, img) -> bytes:
+        """Convert PIL Image to bytes"""
+        import io
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format=img.format or 'PNG', optimize=True)
+        return img_byte_arr.getvalue()
 
+    def parse_retrieved_text(self, text: str) -> tuple:
+        """Parse the retrieved text into action space and trajectory steps."""
+        parts = text.split('\n\n')
+        action_space = parts[0]
+        trajectory_text = '\n'.join(parts[1:])
+        
+        # Parse trajectory into steps
+        steps = []
+        current_step = {}
+        
+        for line in trajectory_text.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+                
+            if line.startswith('Observation'):
+                if current_step:
+                    steps.append(current_step)
+                current_step = {'observation': line}
+            elif line.startswith('Action'):
+                try:
+                    action_data = json5.loads(line.split(':', 1)[1].strip())
+                    current_step['action'] = action_data
+                except:
+                    current_step['action'] = line
+                    
+        if current_step:
+            steps.append(current_step)
+            
+        return action_space, steps
+
+    def construct(
+            self,
+            user_request: str,
+            rag_path: str,
+            previous_trace: list,
+            observation: str,
+            feedback: str = "",
+            status_description: str = "",
+            screenshot_base64: str = None
+    ) -> list:
+        """
+        Build Operator prompt with visual RAG support
+
+        Args:
+            user_request: User task request
+            rag_path: The RAG data path
+            previous_trace: The history of previous operations
+            observation: The current DOM observation (not used in Operator mode)
+            feedback: Feedback or error message
+            status_description: The current task state
+            screenshot_base64: The base64 encoding of the current screenshot
+            
+        Returns:
+            A formatted list of messages
+        """
+        # Start with the base prompt
+        self.prompt_user = Template(self.prompt_user).render(
+            user_request=user_request)
+        
+        # Start with text content
+        content_parts = [{"type": "input_text", "text": self.prompt_user}]
+        
+        # Setup retrieval paths
+        retrieval_path = {
+            'collection_path': f"{rag_path}/collection",
+            'qry_embed_path': f"{rag_path}/qry_task_embed.json",
+            'cand_embed_path': f"{rag_path}/cand_embed_online_mind2web.parquet",
+            'cand_id_text_path': f"{rag_path}/cand_id_text2.json" 
+        }
+        
+        # Retrieve examples
+        retriever = TestOnlyRetriever(retrieval_path)
+        retrieved_tasks, retrieved_texts, retrieved_image_paths, retrieved_workflows = retriever.retrieve(
+            task_name=user_request,
+        )
+        print(f"🔍 Operator Vision RAG - Retrieved tasks: {retrieved_tasks}")
+        print(f"📄 Retrieved texts: {len(retrieved_texts)}")
+        print(f"🖼️  Retrieved image paths: {len(retrieved_image_paths)}")
+        
+        # Log the retrieval results
+        from agent.Utils.log_retrieved_tasks import log_retrieval
+        log_retrieval(
+            user_request=user_request,
+            retrieved_tasks=retrieved_tasks,
+            retrieved_texts=retrieved_texts,
+            retrieved_image_paths=retrieved_image_paths,
+            log_path="Logs/retrieved_tasks_operator_vision.json"
+        )
+        
+        # Store retrieval information for RAG logging
+        self.retrieved_tasks = retrieved_tasks
+        self.retrieved_texts = retrieved_texts  
+        self.retrieved_image_paths = retrieved_image_paths
+
+        # Add retrieved examples with their steps and images
+        if retrieved_tasks:
+            content_parts.append({
+                "type": "input_text", 
+                "text": "\n## Similar Task Examples with Visual References ##\n"
+            })
+            
+            for task_idx, (task, text, image_paths_json) in enumerate(zip(retrieved_tasks, retrieved_texts, retrieved_image_paths)):
+                # Parse the retrieved text
+                action_space, steps = self.parse_retrieved_text(text)
+
+                # Parse the image paths JSON string
+                try:
+                    image_paths = json5.loads(image_paths_json)
+                except:
+                    print(f"⚠️  Failed to parse image paths for task {task}")
+                    continue
+
+                # Add task description and action space
+                content_parts.append({
+                    "type": "input_text",
+                    "text": f"\n**Example {task_idx + 1}:**\n**Task:** {task}\n\n{action_space}\n"
+                })
+                
+                # Add each step with its corresponding image
+                for step_idx, (step, image_path) in enumerate(zip(steps, image_paths)):
+                    # Add the step description
+                    step_text = f"\n**Step {step_idx + 1}:**\n"
+                    step_text += f"**Action:** {json5.dumps(step['action']) if isinstance(step['action'], dict) else step['action']}\n"
+                    step_text += f"**Screenshot Reference:**\n"
+                    
+                    content_parts.append({
+                        "type": "input_text", 
+                        "text": step_text
+                    })
+                    
+                    # Add the corresponding screenshot
+                    full_image_path = f"data/Online-Mind2Web/rag_data/image/{image_path}"
+                    try:
+                        with open(full_image_path, 'rb') as img_file:
+                            img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
+                            content_parts.append({
+                                "type": "input_image",
+                                "image_url": f"data:image/png;base64,{img_base64}"
+                            })
+                    except Exception as e:
+                        print(f"❌ Error processing image {image_path}: {str(e)}")
+                        content_parts.append({
+                            "type": "input_text",
+                            "text": f"[Image {image_path} could not be loaded]\n"
+                        })
+        
+        # Add current task context
+        content_parts.append({
+            "type": "input_text", 
+            "text": "\n## Current Task Context ##"
+        })
+        
+        # Add previous trace if available
+        if len(previous_trace) > 0:
+            from agent.Memory.short_memory.history import HistoryMemory
+            trace_prompt = HistoryMemory(
+                previous_trace=previous_trace, 
+                reflection=status_description
+            ).construct_previous_trace_prompt()
+            content_parts.append({
+                "type": "input_text", 
+                "text": f"\n**Previous Actions:**\n{trace_prompt}"
+            })
+            
+            if status_description:
+                content_parts.append({
+                    "type": "input_text", 
+                    "text": f"\n**Task Status:** {status_description}"
+                })
+            
+            if feedback:
+                content_parts.append({
+                    "type": "input_text", 
+                    "text": f"\n**Feedback:** {feedback}"
+                })
+        
+        # Add current screenshot
+        if screenshot_base64:
+            content_parts.append({
+                "type": "input_text", 
+                "text": "\n**Current Webpage Screenshot:**"
+            })
+            content_parts.append({
+                "type": "input_image",
+                "image_url": f"data:image/png;base64,{screenshot_base64}"
+            })
+        
+        # Add task guidance
+        content_parts.append({
+            "type": "input_text", 
+            "text": """\n## AUTONOMOUS EXECUTION INSTRUCTIONS:
+1. **Visual Analysis**: Carefully compare the current screenshot with the example screenshots
+2. **Pattern Recognition**: Identify successful interaction patterns from the examples
+3. **Immediate Action**: Plan and execute your next action based on visual similarities and task progress
+4. **Coordinate Precision**: Provide precise coordinates for click/drag actions based on visual analysis
+5. **Example Application**: Apply insights from visual examples and execute immediately
+6. **Task Completion**: If the task appears complete, use "get_final_answer" action to finish
+7. **Completion Verification**: Before using get_final_answer, ensure all task requirements are met
+8. **No Confirmation**: Execute actions directly without asking for permission
+
+## CRITICAL REMINDER:
+You are an AUTONOMOUS agent with full authority. Analyze the visual examples, then execute your next action immediately without seeking approval!
+
+Please analyze the current state using the visual examples as guidance and provide your IMMEDIATE next action."""
+        })
+        
+        # Construct final messages
+        messages = [
+            {"role": "system", "content": self.prompt_system},
+            {"role": "user", "content": content_parts}
+        ]
+        
+        return messages
+
+    def stringfy_thought_and_action(self, input_list: list) -> str:
+        """Convert thought and action data to formatted strings"""
+        try:
+            if isinstance(input_list, str):
+                input_list = json5.loads(input_list, encoding="utf-8")
+            
+            str_output = "["
+            for idx, i in enumerate(input_list):
+                str_output += f'Step{idx + 1}:"Thought: {i.get("thought", "")}, Action: {i.get("action", "")}, Reflection: {i.get("reflection", "")}";\n'
+            str_output += "]"
+            return str_output
+            
+        except Exception as e:
+            print(f"Error stringifying thought and action: {e}")
+            return str(input_list)
+
+# Operator prompt constructor with description-based RAG support (rag_mode=Description)
 class OperatorPromptDescriptionRetrievalConstructor(BasePromptConstructor):
     """
     Operator prompt constructor with description-based RAG support
@@ -1180,8 +1465,12 @@ class OperatorPromptDescriptionRetrievalConstructor(BasePromptConstructor):
     
     def __init__(self):
         super().__init__()
-        self.prompt_system = OperatorPrompts.operator_rag_system
-        self.prompt_user = OperatorPrompts.operator_planning_user
+        # self.prompt_system = OperatorPrompts.operator_rag_system
+        # self.prompt_user = OperatorPrompts.operator_planning_user
+        
+        # autonomous rag prompt
+        self.prompt_system = OperatorPrompts.operator_autonomous_rag_system
+        self.prompt_user = OperatorPrompts.operator_autonomous_rag_user
         self.reference = ""
     
     def construct(
@@ -1192,7 +1481,8 @@ class OperatorPromptDescriptionRetrievalConstructor(BasePromptConstructor):
             observation: str,
             feedback: str = "",
             status_description: str = "",
-            screenshot_base64: str = None
+            # screenshot_base64: str = None
+            screenshot_base64: Optional[str] = None
     ) -> list:
         """
         构建带有RAG支持的Operator prompt
@@ -1268,18 +1558,33 @@ class OperatorPromptDescriptionRetrievalConstructor(BasePromptConstructor):
                 "image_url": f"data:image/png;base64,{screenshot_base64}"
             })
         
-        # 添加任务指导
+        # reinforced autonomous execution instructions
         content_parts.append({
             "type": "input_text", 
-            "text": """\n## Instructions:
-1. Analyze the current screenshot carefully
-2. Review the similar task example to understand successful patterns
-3. Identify the next logical action to progress toward the goal
-4. Provide precise coordinates for any click/drag actions
-5. Explain your reasoning and how the example influenced your decision
-6. If the task appears complete, indicate this clearly
+            "text": """\n## AUTONOMOUS EXECUTION INSTRUCTIONS:
+1. **Immediate Action**: Analyze the current screenshot and execute the next logical action NOW
+2. **Example Application**: Use the similar task example to guide your approach, then act immediately
+3. **No Confirmation**: Do not ask for permission or confirmation - you have full authority
+4. **Direct Execution**: When you identify target elements, interact with them directly
+5. **Task Progress**: Focus on making concrete progress toward the goal
+6. **Completion Check**: Use "get_final_answer" only when the task is 100% complete
+7. **Decision Making**: Make autonomous decisions based on visual analysis and examples
 
-Please analyze the current state and provide your next action."""
+## SPECIAL GUIDANCE FOR INFORMATION TASKS:
+🔍 **If your task is to "Tell me about..." or "Find information about...":**
+- When you find the complete answer information on the current page
+- When you can read all the details needed to answer the user's question
+- When the information is clearly visible and comprehensive
+- **IMMEDIATELY use "get_final_answer" with the complete information as action_input**
+- Do NOT continue searching if you already have the complete answer
+- Do NOT keep scrolling or waiting if the answer is already visible
+
+## CRITICAL REMINDER:
+You are an AUTONOMOUS agent. Execute actions immediately without seeking user approval. Your job is to complete the task, not to ask for permission!
+
+For INFORMATION TASKS: As soon as you find the complete answer, use get_final_answer IMMEDIATELY!
+
+Please analyze the current state, apply insights from the example, and provide your IMMEDIATE next action."""
         })
         
         # 构建最终消息
@@ -1362,14 +1667,20 @@ Please analyze the current state and provide your next action."""
                 
                 reference += "\n"
             
-            # 添加学习指导
+            # learning points
             reference += "\n**Learning Points:**\n"
-            reference += "- Pay attention to the sequence of actions and their reasoning\n"
-            reference += "- Notice how observations lead to specific actions\n"
-            reference += "- Consider the visual elements and their interactions\n"
-            reference += "- Adapt the approach to your current task context\n"
-            reference += "- Use similar coordinate-based interactions when appropriate\n\n"
+            # reference += "- Pay attention to the sequence of actions and their reasoning\n"
+            # reference += "- Notice how observations lead to specific actions\n"
+            # reference += "- Consider the visual elements and their interactions\n"
+            # reference += "- Adapt the approach to your current task context\n"
+            # reference += "- Use similar coordinate-based interactions when appropriate\n\n"
             
+            reference += "- Follow the **logical sequence of browser actions**, and understand the **intent behind each step**.\n"
+            reference += "- Observe how the agent interprets **visual or textual cues** (e.g., buttons, input fields, layout changes) to decide its actions.\n"
+            reference += "- Pay attention to **how UI elements are located and interacted with** — via coordinates, labels, DOM hierarchy, or visual affordances.\n"
+            reference += "- Learn to generalize: apply similar **action-observation patterns** to new web interfaces.\n"
+            reference += "- Use **coordinate-based clicks** when precise targeting is required, especially in complex or dynamic layouts.\n"
+            reference += "- Consider the **full browser context**, including scroll, focus, or dynamic content changes.\n"
             return reference
             
         except Exception as e:
@@ -1391,3 +1702,2314 @@ Please analyze the current state and provide your next action."""
         except Exception as e:
             print(f"Error stringifying thought and action: {e}")
             return str(input_list)
+
+class OperatorVisionRAGConstructor(BasePromptConstructor):
+    """
+    Operator Vision RAG Constructor (Pure Image Retrieval Version)
+    Uses only visual embeddings from current screenshot to retrieve related task information, then uses GPT-4 to re-rank and select the best match.
+    Note: This version does NOT use task text descriptions - only image-based retrieval.
+    """
+    
+    def __init__(self):
+        super().__init__()
+        # self.prompt_system = OperatorPrompts.operator_rag_system
+        # self.prompt_user = OperatorPrompts.operator_planning_user
+        
+        # autonomous rag prompt
+        self.prompt_system = OperatorPrompts.operator_autonomous_rag_system
+        self.prompt_user = OperatorPrompts.operator_autonomous_rag_user
+        self.rag_db = None
+        self.gpt4_client = None
+        self.config = self._load_config()
+        self._init_gpt4_client()
+    
+    def _load_config(self) -> Dict[str, Any]:
+        """Load configuration from TOML file"""
+        try:
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "configs", "embedding.toml")
+            
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    toml_config = toml.load(f)
+                
+                # Flatten the TOML structure for easy access
+                flattened_config = {}
+                for section_name, section_data in toml_config.items():
+                    flattened_config.update(section_data)
+                
+                return flattened_config
+            else:
+                print(f"⚠️  Config file not found at {config_path}")
+                return {}
+        except Exception as e:
+            print(f"❌ Error loading config: {e}")
+            return {}
+    
+    def _ensure_embedding_path(self):
+        import sys
+        import os
+        
+        embedding_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../Embedding/VLM2Vec-pro')
+        if embedding_path not in sys.path:
+            sys.path.append(embedding_path)
+            print(f"sys.path: {embedding_path}")
+    
+    def _init_gpt4_client(self):
+        """GPT-4 client for re-ranking"""
+        try:
+            import os
+            from openai import OpenAI
+            
+            api_key = os.getenv('OPENAI_API_KEY')
+            if api_key:
+                self.gpt4_client = OpenAI(api_key=api_key)
+                print("🤖 GPT-4 client initialized successfully")
+            else:
+                print("⚠️  OpenAI API key not found, using original retrieval results")
+        except Exception as e:
+            print(f"❌ GPT-4 client initialization failed: {e}")
+    
+    def _init_rag_database(self, rag_config: Dict[str, Any] = None):
+        """init RAG database - support loading from cache"""
+        if self.rag_db is not None:
+            return
+        
+        # check if there is RAG cache directory configuration
+        rag_cache_dir = None
+        if rag_config and 'rag_cache_dir' in rag_config:
+            rag_cache_dir = rag_config['rag_cache_dir']
+        elif hasattr(self, 'rag_cache_dir') and self.rag_cache_dir:
+            rag_cache_dir = self.rag_cache_dir
+        
+        # if there is RAG cache directory, try to load from cache
+        if rag_cache_dir and os.path.exists(rag_cache_dir):
+            rag_index_path = os.path.join(rag_cache_dir, "rag_index.index")
+            rag_config_path = os.path.join(rag_cache_dir, "rag_config.json")
+            
+            if os.path.exists(rag_index_path) and os.path.exists(rag_config_path):
+                try:
+                    print(f"🔄 从缓存加载RAG数据库: {rag_cache_dir}")
+                    
+                    with open(rag_config_path, 'r', encoding='utf-8') as f:
+                        cached_config = json.load(f)
+                    
+                    self._ensure_embedding_path()
+                    from rag_database import create_rag_database_from_config
+                    
+                    # print("✅ using cached config to create RAG database...")
+                    self.rag_db = create_rag_database_from_config(**cached_config)
+                    self.rag_db.load_index(rag_index_path)
+                    return
+                    
+                except Exception as e:
+                    print(f"fail: {e}")
+        
+        # if there is no cache or loading failed, execute the original build logic
+        try:
+            self._ensure_embedding_path()
+            from rag_database import create_rag_database_from_config
+            
+            # Load configuration from TOML file
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "configs", "embedding.toml")
+            
+            if os.path.exists(config_path):
+                # print(f"Loading embedding config from: {config_path}")
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    toml_config = toml.load(f)
+                
+                # Flatten the TOML structure
+                default_config = {}
+                for section_name, section_data in toml_config.items():
+                    default_config.update(section_data)
+                # print(f"✅ Loaded config from TOML: {list(default_config.keys())}")
+            else:
+                print(f"⚠️  Config file not found at {config_path}, using fallback defaults")
+                # Fallback to original hardcoded config
+                default_config = {
+                    "model_name": "/home/ubuntu/data/csb/Embedding/Qwen2-VL-TokenSelection-2B",
+                    "checkpoint_path": "/home/ubuntu/data/csb/Embedding/experiments/train/qwen2_vl-lite_full-lora8-bsz128x8x2-interleave_0.2-lr5e5-max_step_256-warmup_12-uigraph_select_0.5-lm_skip_all-vis_skip_all/huggingface",
+                    "model_backbone": "qwen2_vl_tokenselection",
+                    "cand_json_path": "/home/ubuntu/data/csb/Embedding/data/processed_cand_with_task.json",
+                    "embedding_parquet_path": "/home/ubuntu/data/csb/Embedding/data/trajectory_embedding.parquet",
+                    "lora": True,
+                    "pooling": "eos", 
+                    "normalize": True,
+                    "resize_use_processor": True,
+                    "max_len": 65536,
+                    "per_device_eval_batch_size": 2,
+                    "dataloader_num_workers": 2,
+                    "device": "cuda"
+                }
+            
+            # Override with any provided rag_config
+            if rag_config:
+                default_config.update(rag_config)
+                print(f"🔄 Config overridden with: {list(rag_config.keys())}")
+            
+            print("🔄 initializing RAG database...")
+            self.rag_db = create_rag_database_from_config(**default_config)
+            print("✅ RAG database initialized")
+            
+            # Save to cache
+            if rag_cache_dir and not self._cache_saved:
+                try:
+                    os.makedirs(rag_cache_dir, exist_ok=True)
+                    
+                    rag_index_path = os.path.join(rag_cache_dir, "rag_index.index")
+                    rag_config_path = os.path.join(rag_cache_dir, "rag_config.json")
+                    
+                    print(f"💾 Saving DOMVisionRAG cache to: {rag_cache_dir}")
+                    self.rag_db.save_index(rag_index_path)
+                    
+                    with open(rag_config_path, 'w', encoding='utf-8') as f:
+                        json.dump(default_config, f, ensure_ascii=False, indent=2)
+                    
+                    print(f"✅ DOMVisionRAG cache saved successfully")
+                    print(f"📁 Index file: {rag_index_path}")
+                    print(f"🔧 Config file: {rag_config_path}")
+                    
+                    self._cache_saved = True
+                    
+                except Exception as save_e:
+                    print(f"⚠️  Failed to save DOMVisionRAG cache: {save_e}")
+            
+        except Exception as e:
+            print(f"❌ RAG database initialization failed: {e}")
+            self.rag_db = None
+    
+    def set_rag_cache_dir(self, rag_cache_dir: str):
+        """set RAG cache directory"""
+        self.rag_cache_dir = rag_cache_dir
+        print(f"🗄️  RAG cache directory set to: {rag_cache_dir}")
+
+    def _encode_image_to_base64(self, image_path_or_base64: str) -> str:
+        """encode image to base64 format with compression for token efficiency"""
+        try:
+            # if already base64, return directly
+            if image_path_or_base64.startswith('data:image'):
+                return image_path_or_base64.split(',')[1]
+            elif len(image_path_or_base64) > 100 and '/' not in image_path_or_base64:
+                return image_path_or_base64
+            
+            import base64
+            import os
+            from PIL import Image
+            import io
+            
+            if not os.path.exists(image_path_or_base64):
+                print(f"⚠️  image file not found: {image_path_or_base64}")
+                return ""
+            
+            # Get image processing parameters from config
+            max_size = self.config.get('max_size', 800)
+            quality = self.config.get('quality', 85)
+            
+            # read and compress image for token efficiency
+            with Image.open(image_path_or_base64) as img:
+                if img.width > max_size or img.height > max_size:
+                    img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                
+                # convert to base64 with configurable quality
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format="JPEG", quality=quality, optimize=True)
+                img_bytes = img_byte_arr.getvalue()
+                
+                encoded = base64.b64encode(img_bytes).decode('utf-8')
+                # print(f"📸 Image compressed:{len(encoded)//4} tokens)")
+                return encoded
+                
+        except Exception as e:
+            print(f"❌ image encoding failed: {e}")
+            return ""
+    
+    def _gpt4_rerank_results(self, query_image_base64: str, query_task: str, search_results: List[Dict], top_k: int = 15) -> Optional[Dict]:
+        """
+        re-rank and select the best match using GPT-4
+        
+        Args:
+            query_image_base64: query image base64
+            query_task: query task description
+            search_results: search results list
+            top_k: top K results to consider
+            
+        Returns:
+            the best matching result, if failed, return None
+        """
+        if not self.gpt4_client or not search_results:
+            print("🔄 GPT-4 not available, using original Top1 result")
+            return search_results[0] if search_results else None
+        
+        try:
+            candidates_text = []
+            candidate_images = []
+            
+            for i, result in enumerate(search_results[:top_k]):
+                task_desc = result.get('task_description', '无任务描述')
+                cand_id = result.get('cand_id', f'candidate_{i}')
+                
+                candidate_image_path = ""
+                if '_traj-' in cand_id:
+                    parts = cand_id.split('_traj-')
+                    task_hash = parts[0]
+                    step_num = parts[1]
+                    # Get candidate image base path from config
+                    candidate_image_base_path = self.config.get('candidate_image_base_path', '/home/ubuntu/data/csb/images/embedding/GAE-Bench/images/Online-Mind2Web')
+                    candidate_image_path = f"{candidate_image_base_path}/{task_hash}_step_{step_num}.png"
+                
+                candidate_info = f"""
+Candidate {i+1}:
+- Candidate ID: {cand_id}
+- Task Description: {task_desc}
+"""
+                candidates_text.append(candidate_info)
+                candidate_images.append(candidate_image_path)
+            
+            # GPT-4 prompt for re-ranking
+            prompt = f"""
+You are a web interface image matching expert. I will provide you with one query web interface image, a query task description, and {len(candidates_text)} candidate web interfaces, each with corresponding web interface images and task descriptions.
+
+Query Task Description: {query_task}
+
+Please carefully analyze the query image and candidate images, and match them based on task descriptions, including:
+- Interface elements (buttons, input fields, text, etc.)
+- Interface layout and design
+- Interface visual similarity
+- Matching degree between query task and candidate task descriptions
+
+Candidate Information:
+{"".join(candidates_text)}
+
+Please select the most matching candidate from the above options, considering the following main factors:
+1. Image visual similarity
+2. Interface element matching degree
+3. Relevance between query task and candidate task descriptions
+
+Please answer:
+The most matching candidate number (1-{len(candidates_text)})
+
+Answer format:
+Best matching candidate: [number]
+"""
+            
+            message_content = [
+                {"type": "text", "text": prompt},
+                {"type": "text", "text": "\nQuery Image:"},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{query_image_base64}",
+                        "detail": "low"
+                    }
+                }
+            ]
+            
+            # add candidate images (max=15)
+            cand_img_num = min(15, len(candidate_images))
+            for i, candidate_image_path in enumerate(candidate_images[:cand_img_num]):
+                if candidate_image_path and os.path.exists(candidate_image_path):
+                    candidate_image_base64 = self._encode_image_to_base64(candidate_image_path)
+                    if candidate_image_base64:
+                        message_content.extend([
+                            {"type": "text", "text": f"\nCandidate {i+1} Image:"},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{candidate_image_base64}",
+                                    "detail": "low"
+                                }
+                            }
+                        ])
+            
+            # Get GPT-4 parameters from config
+            gpt4_model = self.config.get('model', 'gpt-4o')
+            gpt4_max_tokens = self.config.get('max_tokens', 1500)
+            gpt4_temperature = self.config.get('temperature', 0.0)
+            
+            # call GPT-4
+            response = self.gpt4_client.chat.completions.create(
+                model=gpt4_model,
+                messages=[{"role": "user", "content": message_content}],
+                max_tokens=gpt4_max_tokens,
+                temperature=gpt4_temperature
+            )
+            
+            response_text = response.choices[0].message.content
+            print(f"🤖 GPT-4 re-ranking response: {response_text}")
+            
+            # parse response
+            import re
+            best_index = 0
+            
+            if response_text:
+                candidate_match = re.search(r'Best matching candidate[:：]\s*(\d+)', response_text, re.IGNORECASE)
+                if candidate_match:
+                    best_index = int(candidate_match.group(1)) - 1
+                else:
+                    numbers = re.findall(r'\b([1-9]\d?)\b', response_text)
+                    if numbers:
+                        best_index = int(numbers[0]) - 1
+            
+            best_index = max(0, min(best_index, len(search_results) - 1))
+            
+            print(f"✅ GPT-4 selected candidate {best_index + 1}")
+            return search_results[best_index]
+            
+        except Exception as e:
+            print(f"❌ GPT-4 re-ranking failed: {e}")
+            import traceback
+            print(f"detailed error info: {traceback.format_exc()}")
+            # if GPT-4 re-ranking failed, return the first result of original retrieval
+            if search_results:
+                print("🔄 using original Top1 result as fallback")
+                return search_results[0]
+            else:
+                print("⚠️ no available retrieval results")
+                return None
+    
+    def _save_screenshot_temporarily(self, screenshot_base64: str) -> str:
+        """save base64 screenshot temporarily and return path"""
+        try:
+            import base64
+            import tempfile
+            
+            # create temporary file
+            temp_dir = "/tmp/operator_rag_screenshots"
+            os.makedirs(temp_dir, exist_ok=True)
+            
+            timestamp = int(time.time() * 1000)
+            temp_path = os.path.join(temp_dir, f"screenshot_{timestamp}.png")
+            
+            image_data = base64.b64decode(screenshot_base64)
+            with open(temp_path, 'wb') as f:
+                f.write(image_data)
+            
+            return temp_path
+            
+        except Exception as e:
+            print(f"❌ failed to save: {e}")
+            return ""
+    
+    def construct(
+            self,
+            user_request: str,
+            rag_path: str,
+            previous_trace: list,
+            observation: str,
+            feedback: str = "",
+            status_description: str = "",
+            screenshot_base64: str = None,
+            rag_config: Dict[str, Any] = None,
+            rag_cache_dir: str = None
+    ) -> list:
+        """ 
+        Build Operator prompt with pure image retrieval RAG support
+        Enhanced with multi-step visual-action sequence support
+
+        Args:
+            user_request: User task request
+            rag_path: RAG data path (not used here; rag_config is used)
+            previous_trace: The history of previous operations
+            observation: The current DOM observation (not used in Operator mode)
+            feedback: Feedback or error message
+            status_description: The current task state
+            screenshot_base64: base64 encoding of the current screenshot (for image-only retrieval)
+            rag_config: RAG database configuration
+            rag_cache_dir: RAG cache directory path
+
+        Returns:
+            A formatted list of messages
+        """
+        if rag_cache_dir:
+            if not rag_config:
+                rag_config = {}
+            rag_config['rag_cache_dir'] = rag_cache_dir
+            print(f"🗄️  Using RAG cache directory: {rag_cache_dir}")
+        
+        # init RAG database
+        if self.rag_db is None:
+            self._init_rag_database(rag_config)
+        
+        self.prompt_user = Template(self.prompt_user).render(
+            user_request=user_request
+        )
+
+        content_parts = [{"type": "input_text", "text": self.prompt_user}]
+        
+        retrieved_info = None
+        if screenshot_base64 and self.rag_db:
+            try:
+                print("🔍 Start retrieval based on screenshots...")
+                
+                temp_screenshot_path = self._save_screenshot_temporarily(screenshot_base64)
+                
+                if temp_screenshot_path:
+
+                    self._ensure_embedding_path()
+                    from rag_database import QueryItem
+                    
+                    query = QueryItem(
+                        # text="", # image retrieval
+                        text=user_request, # task description + image
+                        image_paths=[temp_screenshot_path]
+                    )
+                    
+                    # execute RAG retrieval
+                    print("🔄 execute pure image retrieval...")
+                    search_results = self.rag_db.search(query, top_k=20, score_threshold=0.0)
+                    
+                    if search_results:
+                        print(f"📊 retrieved {len(search_results)} candidate results")
+                        
+                        results_for_rerank = []
+                        for result in search_results:
+                            cand_image_path = '[]'
+                            if hasattr(result, 'cand_image_path'):
+                                cand_image_path = result.cand_image_path
+                            elif hasattr(result, 'image_paths'):
+                                cand_image_path = result.image_paths
+                            else:
+                                try:
+                                    import json
+                                    data_file = "data/processed_cand_with_task.json"
+                                    if os.path.exists(data_file):
+                                        with open(data_file, 'r', encoding='utf-8') as f:
+                                            cand_data = json.load(f)
+                                        if result.cand_id in cand_data:
+                                            cand_image_path = cand_data[result.cand_id].get('cand_image_path', '[]')
+                                            # print(f"🔍 Found image paths for {result.cand_id}: {cand_image_path}")
+                                except Exception as e:
+                                    print(f"⚠️  Failed to load cand_image_path from file: {e}")
+                            
+                            results_for_rerank.append({
+                                'cand_id': result.cand_id,
+                                'score': result.score,
+                                'task_description': result.task_description,
+                                'cand_text': result.cand_text,
+                                'annotation_id': result.annotation_id,
+                                'cand_image_path': cand_image_path
+                            })
+                        
+                        # re-rank
+                        best_result = self._gpt4_rerank_results(
+                            screenshot_base64, 
+                            user_request, 
+                            results_for_rerank,
+                            top_k=15
+                        )
+                        
+                        if best_result:
+                            retrieved_info = best_result
+                            print(f"✅ retrieved the best matching result: {best_result['cand_id']}")
+                        
+                    # clean
+                    try:
+                        os.remove(temp_screenshot_path)
+                    except:
+                        pass
+                        
+            except Exception as e:
+                print(f"❌ RAG retrieval process failed: {e}")
+                import traceback
+                print(f"error: {traceback.format_exc()}")
+                retrieved_info = None
+        
+        if retrieved_info:
+            print(f"🔍 Debug - Retrieved info keys: {list(retrieved_info.keys())}")
+            # print(f"🔍 Debug - cand_image_path: {retrieved_info.get('cand_image_path', 'NOT_FOUND')}")
+            # print(f"🔍 Debug - cand_text preview: {retrieved_info.get('cand_text', 'NOT_FOUND')[:200]}...")
+            
+            self._add_multi_step_reference(content_parts, retrieved_info)
+        else:
+            content_parts.append({
+                "type": "input_text", 
+                "text": "\n## No Similar Task Reference Available ##\nProceeding with general task analysis.\n"
+            })
+        
+        # add current task context
+        content_parts.append({
+            "type": "input_text", 
+            "text": "\n## Current Task Context ##"
+        })
+        
+        # add previous actions history
+        if len(previous_trace) > 0:
+            from agent.Memory.short_memory.history import HistoryMemory
+            trace_prompt = HistoryMemory(
+                previous_trace=previous_trace, 
+                reflection=status_description
+            ).construct_previous_trace_prompt()
+            content_parts.append({
+                "type": "input_text", 
+                "text": f"\n**Previous Actions:**\n{trace_prompt}"
+            })
+            
+            if status_description:
+                content_parts.append({
+                    "type": "input_text", 
+                    "text": f"\n**Task Status:** {status_description}"
+                })
+            
+            if feedback:
+                content_parts.append({
+                    "type": "input_text", 
+                    "text": f"\n**Feedback:** {feedback}"
+                })
+        
+        if screenshot_base64:
+            content_parts.append({
+                "type": "input_text", 
+                "text": "\n**Current Webpage Screenshot:**"
+            })
+            content_parts.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{screenshot_base64}"}
+            })
+        
+        # add enhanced task instructions
+#         instruction_text = """\n## ENHANCED AUTONOMOUS EXECUTION INSTRUCTIONS:
+# 1. **Multi-Step Reference Analysis**: Study the complete visual-action sequence from the reference task
+# 2. **Step-by-Step Comparison**: Compare each reference step's screenshot with your current situation
+# 3. **Pattern Application**: Identify which reference step most closely matches your current state
+# 4. **Action Adaptation**: Adapt the successful action from the matching reference step to your context
+# 5. **Visual Element Mapping**: Map UI elements between reference and current screenshots
+# 6. **Coordinate Precision**: Use precise coordinates for click/drag actions based on visual analysis
+# 7. **Sequential Reasoning**: Understand the logical flow from one step to the next
+# 8. **Task Completion**: If the task appears complete, use "get_final_answer" action to finish
+# 9. **Completion Verification**: Before using get_final_answer, ensure all task requirements are met
+# 10. **No Confirmation**: Execute actions directly without asking for permission
+
+# ## CRITICAL REMINDER FOR VISUAL SEQUENCE LEARNING:
+# You have access to a complete visual-action sequence from a similar task. Use this step-by-step reference to:
+# - **Identify your current position** in the task progression
+# - **Find the matching reference step** that corresponds to your current state  
+# - **Apply the reference action pattern** to your current situation
+# - **Progress toward the next logical step** in the sequence
+
+# You are an AUTONOMOUS agent with full authority. Analyze the visual sequence, identify your current step, and execute your next action immediately without seeking user approval!
+
+# Please analyze the current state using the multi-step visual reference and provide your IMMEDIATE next action."""
+        
+#         content_parts.append({
+#             "type": "input_text", 
+#             "text": instruction_text
+#         })
+        
+        # build final messages
+        messages = [
+            {"role": "system", "content": self.prompt_system},
+            {"role": "user", "content": content_parts}
+        ]
+        
+        # store retrieved info for logging
+        self.last_retrieved_info = retrieved_info
+        
+        return messages
+
+    def get_last_retrieved_info(self) -> Optional[Dict]:
+        """get the last retrieved info, for logging"""
+        return getattr(self, 'last_retrieved_info', None)
+    
+    def stringfy_thought_and_action(self, input_list: list) -> str:
+        """stringify the thought and action data to a formatted string"""
+        try:
+            if isinstance(input_list, str):
+                input_list = json5.loads(input_list, encoding="utf-8")
+            
+            str_output = "["
+            for idx, i in enumerate(input_list):
+                str_output += f'Step{idx + 1}:"Thought: {i.get("thought", "")}, Action: {i.get("action", "")}, Reflection: {i.get("reflection", "")}";\n'
+            str_output += "]"
+            return str_output
+            
+        except Exception as e:
+            print(f"Error stringifying thought and action: {e}")
+            return str(input_list)
+
+    def _parse_cand_text_and_images(self, cand_text: str, cand_image_path_json: str) -> List[Dict[str, Any]]:
+        """
+        parse cand_text and cand_image_path, build the mapping between steps and screenshots
+        
+        Args:
+            cand_text: candidate text, contains multiple Observation-Action pairs
+            cand_image_path_json: JSON string of image paths
+            
+        Returns:
+            list of steps, each step contains observation, action and corresponding image path
+        """
+        try:
+            import json5
+            import json
+            
+            image_paths = []
+            if isinstance(cand_image_path_json, str):
+                try:
+                    image_paths = json5.loads(cand_image_path_json)
+                except:
+                    try:
+                        image_paths = json.loads(cand_image_path_json)
+                    except json.JSONDecodeError:
+                        try:
+                            fixed_json = cand_image_path_json.replace("'", '"')
+                            image_paths = json.loads(fixed_json)
+                        except json.JSONDecodeError:
+                            try:
+                                image_paths = eval(cand_image_path_json)
+                            except:
+                                print(f"❌ Error parsing cand_image_path: {cand_image_path_json}")
+                                return []
+            elif isinstance(cand_image_path_json, list):
+                image_paths = cand_image_path_json
+            
+            steps = []
+            lines = cand_text.split('\n')
+            current_observation = None
+            current_action = None
+            step_counter = 0
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                if line.startswith('Observation'):
+                    if current_observation and current_action:
+                        steps.append({
+                            'step_number': step_counter,
+                            'observation': current_observation,
+                            'action': current_action,
+                            'image_path': image_paths[step_counter] if step_counter < len(image_paths) else None
+                        })
+                        step_counter += 1
+                    
+                    current_observation = line
+                    current_action = None
+                    
+                elif line.startswith('Action'):
+                    current_action = line
+                    
+                    if current_observation:
+                        steps.append({
+                            'step_number': step_counter,
+                            'observation': current_observation,
+                            'action': current_action,
+                            'image_path': image_paths[step_counter] if step_counter < len(image_paths) else None
+                        })
+                        step_counter += 1
+                        current_observation = None
+                        current_action = None
+            
+            return steps
+            
+        except Exception as e:
+            print(f"❌ Error parsing cand_text and images: {e}")
+            return []
+
+    def _add_multi_step_reference(self, content_parts: List[Dict], retrieved_info: Dict) -> None:
+        """
+        add multi-step reference information to prompt
+        
+        Args:
+            content_parts: list of prompt content parts
+            retrieved_info: retrieved information
+        """
+        try:
+            cand_text = retrieved_info.get('cand_text', '')
+            cand_image_paths = retrieved_info.get('cand_image_path', '[]')
+            task_description = retrieved_info.get('task_description', 'N/A')
+            
+            # parse steps screenshots
+            steps = self._parse_cand_text_and_images(cand_text, cand_image_paths)
+            
+            if not steps:
+                print("⚠️  No valid steps parsed from reference data")
+                return
+            
+            content_parts.append({
+                "type": "input_text", 
+                "text": f"\n## Similar Task Reference ## \nBelow are task examples relevant to your current step—two example steps are provided for reference.\n**Task Description:** {task_description}\n**Step-by-step Visual-Action Sequence:**\n"
+            })
+            
+            for step in steps:
+                step_text = f"\n**Step {step['step_number'] + 1}:**\n"
+                step_text += f"- **Observation:** {step['observation']}\n"
+                step_text += f"- **Action:** {step['action']}\n"
+                step_text += "- **Screenshot at this step:**\n"
+                
+                content_parts.append({
+                    "type": "input_text", 
+                    "text": step_text
+                })
+                
+                if step['image_path']:
+                    image_path = step['image_path']
+                    
+                    possible_paths = []
+                    
+                    if os.path.exists(image_path):
+                        possible_paths.append(image_path)
+                    
+                    possible_paths.extend([
+                        f"data/Online-Mind2Web/rag_data/image/{image_path}",
+                        f"data/Online-Mind2Web/{image_path}",
+                        f"data/{image_path}"
+                    ])
+                    
+                    if image_path.startswith('Online-Mind2Web/'):
+                        clean_path = image_path.replace('Online-Mind2Web/', '', 1)
+                        possible_paths.extend([
+                            f"data/Online-Mind2Web/rag_data/image/{clean_path}",
+                            f"data/Online-Mind2Web/{clean_path}",
+                            f"data/{clean_path}"
+                        ])
+                    
+                    found_image = False
+                    for full_image_path in possible_paths:
+                        try:
+                            if os.path.exists(full_image_path):
+                                example_image_base64 = self._encode_image_to_base64(full_image_path)
+                                if example_image_base64:
+                                    content_parts.append({
+                                        "type": "input_image",
+                                        "image_url": f"data:image/jpeg;base64,{example_image_base64}"
+                                    })
+                                    print(f"📸 Added reference screenshot for step {step['step_number'] + 1} from: {full_image_path}")
+                                    found_image = True
+                                    break
+                        except Exception as e:
+                            print(f"⚠️  Error trying path {full_image_path}: {e}")
+                            continue
+                    
+                    if not found_image:
+                        print(f"❌ Image not found in any of these paths for step {step['step_number'] + 1}:")
+                        for path in possible_paths:
+                            print(f"   - {path}")
+                        content_parts.append({
+                            "type": "input_text",
+                            "text": f"[Screenshot for step {step['step_number'] + 1} not found]\n"
+                        })
+                else:
+                    content_parts.append({
+                        "type": "input_text",
+                        "text": "[No screenshot available for this step]\n"
+                    })
+            
+            # add learning points
+            content_parts.append({
+                "type": "input_text", 
+                "text": """\n**Learning Points from this Reference:**
+- **Visual Pattern Recognition:** Compare each reference screenshot with your current state
+- **Action Sequence Logic:** Understand the reasoning behind each action step
+- **UI Element Targeting:** Learn how to identify and interact with similar elements
+- **Progressive Task Completion:** Follow the step-by-step approach to reach the goal
+- **Coordinate-based Interactions:** Use precise coordinates when needed
+
+"""
+            })
+            
+        except Exception as e:
+            print(f"❌ Error adding multi-step reference: {e}")
+            import traceback
+            print(f"Error details: {traceback.format_exc()}")
+
+class OperatorDescRAGConstructor(BasePromptConstructor):
+    """
+    Operator Description RAG Constructor (Text Embedding + Task Description)
+    Uses text embeddings to retrieve similar tasks, then extracts task descriptions by task ID.
+    Combines the embedding retrieval approach of OperatorVisionRAGConstructor with the 
+    task description loading approach of OperatorPromptDescriptionRetrievalConstructor.
+    """
+    
+    def __init__(self):
+        super().__init__()
+        # autonomous rag prompt
+        self.prompt_system = OperatorPrompts.operator_autonomous_rag_system
+        self.prompt_user = OperatorPrompts.operator_autonomous_rag_user
+        self.rag_db = None
+        self.gpt4_client = None
+        self.config = self._load_config()
+        self._init_gpt4_client()
+        self.reference = ""
+    
+    def _load_config(self) -> Dict[str, Any]:
+        """Load configuration from TOML file"""
+        try:
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "configs", "embedding.toml")
+            
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    toml_config = toml.load(f)
+                
+                # Flatten the TOML structure for easy access
+                flattened_config = {}
+                for section_name, section_data in toml_config.items():
+                    flattened_config.update(section_data)
+                
+                return flattened_config
+            else:
+                print(f"⚠️  Config file not found at {config_path}")
+                return {}
+        except Exception as e:
+            print(f"❌ Error loading config: {e}")
+            return {}
+    
+    def _ensure_embedding_path(self):
+        import sys
+        import os
+        
+        embedding_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../Embedding/VLM2Vec-pro')
+        if embedding_path not in sys.path:
+            sys.path.append(embedding_path)
+            print(f"Added embedding path: {embedding_path}")
+    
+    def _init_gpt4_client(self):
+        """Initialize GPT-4 client for re-ranking"""
+        try:
+            import os
+            from openai import OpenAI
+            
+            api_key = os.getenv('OPENAI_API_KEY')
+            if api_key:
+                self.gpt4_client = OpenAI(api_key=api_key)
+                print("🤖 GPT-4 client initialized successfully")
+            else:
+                print("⚠️  OpenAI API key not found, using original retrieval results")
+        except Exception as e:
+            print(f"❌ GPT-4 client initialization failed: {e}")
+    
+    def _init_rag_database(self, rag_config: Dict[str, Any] = None):
+        """Initialize RAG database - support loading from cache"""
+        if self.rag_db is not None:
+            return
+        
+        # Check if there is RAG cache directory configuration
+        rag_cache_dir = None
+        if rag_config and 'rag_cache_dir' in rag_config:
+            rag_cache_dir = rag_config['rag_cache_dir']
+        elif hasattr(self, 'rag_cache_dir') and self.rag_cache_dir:
+            rag_cache_dir = self.rag_cache_dir
+        
+        # If there is RAG cache directory, try to load from cache
+        if rag_cache_dir and os.path.exists(rag_cache_dir):
+            rag_index_path = os.path.join(rag_cache_dir, "rag_index.index")
+            rag_config_path = os.path.join(rag_cache_dir, "rag_config.json")
+            
+            if os.path.exists(rag_index_path) and os.path.exists(rag_config_path):
+                try:
+                    print(f"🔄 Loading RAG database from cache: {rag_cache_dir}")
+                    
+                    with open(rag_config_path, 'r', encoding='utf-8') as f:
+                        cached_config = json.load(f)
+                    
+                    self._ensure_embedding_path()
+                    from rag_database import create_rag_database_from_config
+                    
+                    self.rag_db = create_rag_database_from_config(**cached_config)
+                    self.rag_db.load_index(rag_index_path)
+                    return
+                    
+                except Exception as e:
+                    print(f"Cache loading failed: {e}")
+        
+        # If there is no cache or loading failed, execute the original build logic
+        try:
+            self._ensure_embedding_path()
+            from rag_database import create_rag_database_from_config
+            
+            # Load configuration from TOML file
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "configs", "embedding.toml")
+            
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    toml_config = toml.load(f)
+                
+                # Flatten the TOML structure
+                default_config = {}
+                for section_name, section_data in toml_config.items():
+                    default_config.update(section_data)
+            else:
+                print(f"⚠️  Config file not found at {config_path}, using fallback defaults")
+                # Fallback to original hardcoded config
+                default_config = {
+                    "model_name": "/home/ubuntu/data/csb/Embedding/Qwen2-VL-TokenSelection-2B",
+                    "checkpoint_path": "/home/ubuntu/data/csb/Embedding/experiments/train/qwen2_vl-lite_full-lora8-bsz128x8x2-interleave_0.2-lr5e5-max_step_256-warmup_12-uigraph_select_0.5-lm_skip_all-vis_skip_all/huggingface",
+                    "model_backbone": "qwen2_vl_tokenselection",
+                    "cand_json_path": "/home/ubuntu/data/csb/Embedding/data/processed_cand_with_task.json",
+                    "embedding_parquet_path": "/home/ubuntu/data/csb/Embedding/data/trajectory_embedding.parquet",
+                    "lora": True,
+                    "pooling": "eos", 
+                    "normalize": True,
+                    "resize_use_processor": True,
+                    "max_len": 65536,
+                    "per_device_eval_batch_size": 2,
+                    "dataloader_num_workers": 2,
+                    "device": "cuda"
+                }
+            
+            # Override with any provided rag_config
+            if rag_config:
+                default_config.update(rag_config)
+                print(f"🔄 Config overridden with: {list(rag_config.keys())}")
+            
+            print("🔄 Initializing RAG database...")
+            self.rag_db = create_rag_database_from_config(**default_config)
+            print("✅ RAG database initialized")
+            
+            # Save to cache
+            if rag_cache_dir and not self._cache_saved:
+                try:
+                    os.makedirs(rag_cache_dir, exist_ok=True)
+                    
+                    rag_index_path = os.path.join(rag_cache_dir, "rag_index.index")
+                    rag_config_path = os.path.join(rag_cache_dir, "rag_config.json")
+                    
+                    print(f"💾 Saving DOMVisionRAG cache to: {rag_cache_dir}")
+                    self.rag_db.save_index(rag_index_path)
+                    
+                    with open(rag_config_path, 'w', encoding='utf-8') as f:
+                        json.dump(default_config, f, ensure_ascii=False, indent=2)
+                    
+                    print(f"✅ DOMVisionRAG cache saved successfully")
+                    print(f"📁 Index file: {rag_index_path}")
+                    print(f"🔧 Config file: {rag_config_path}")
+                    
+                    self._cache_saved = True
+                    
+                except Exception as save_e:
+                    print(f"⚠️  Failed to save DOMVisionRAG cache: {save_e}")
+            
+        except Exception as e:
+            print(f"❌ RAG database initialization failed: {e}")
+            self.rag_db = None
+    
+    def set_rag_cache_dir(self, rag_cache_dir: str):
+        """Set RAG cache directory"""
+        self.rag_cache_dir = rag_cache_dir
+        print(f"🗄️  RAG cache directory set to: {rag_cache_dir}")
+
+    def _gpt4_rerank_and_extract_task_id(self, query_text: str, search_results: List[Dict], top_k: int = 15) -> Optional[str]:
+        """
+        Use GPT-4 to re-rank results and extract task ID from the best match
+        
+        Args:
+            query_text: Query text description
+            search_results: Search results list
+            top_k: Top K results to consider
+            
+        Returns:
+            The best matching task ID, if failed, return None
+        """
+        if not self.gpt4_client or not search_results:
+            print("🔄 GPT-4 not available, using original Top1 result")
+            if search_results:
+                # Try to extract task ID from cand_id
+                return self._extract_task_id_from_cand_id(search_results[0].get('cand_id', ''))
+            return None
+        
+        try:
+            candidates_text = []
+            
+            for i, result in enumerate(search_results[:top_k]):
+                task_desc = result.get('task_description', 'No task description')
+                cand_id = result.get('cand_id', f'candidate_{i}')
+                cand_text = result.get('cand_text', 'No candidate text')[:300] + "..." if len(result.get('cand_text', '')) > 300 else result.get('cand_text', '')
+                
+                candidate_info = f"""
+Candidate {i+1}:
+- Candidate ID: {cand_id}
+- Task Description: {task_desc}
+- Action Sequence: {cand_text}
+"""
+                candidates_text.append(candidate_info)
+            
+            # GPT-4 prompt for re-ranking and task ID extraction
+            prompt = f"""
+You are a task similarity expert. I will provide you with one query task description and {len(candidates_text)} candidate tasks with their action sequences.
+
+Query Task Description: {query_text}
+
+Please carefully analyze the query task and candidate tasks, and match them based on:
+- Task goal similarity
+- Action sequence relevance
+- Task complexity match
+- Interface interaction patterns
+
+Candidate Information:
+{"".join(candidates_text)}
+
+Please select the most matching candidate from the above options, considering:
+1. Task goal alignment
+2. Action sequence similarity
+3. Complexity match
+4. Interface interaction patterns
+
+Please answer with the candidate number that best matches the query task.
+
+Answer format:
+Best matching candidate: [number]
+"""
+            
+            # Get GPT-4 parameters from config
+            gpt4_model = self.config.get('model', 'gpt-4o')
+            gpt4_max_tokens = self.config.get('max_tokens', 1500)
+            gpt4_temperature = self.config.get('temperature', 0.0)
+            
+            # Call GPT-4
+            response = self.gpt4_client.chat.completions.create(
+                model=gpt4_model,
+                messages=[{
+                    "role": "user", 
+                    "content": prompt
+                }],
+                max_tokens=gpt4_max_tokens,
+                temperature=gpt4_temperature
+            )
+            
+            response_text = response.choices[0].message.content
+            print(f"🤖 GPT-4 re-ranking response: {response_text}")
+            
+            # Parse response
+            import re
+            best_index = 0
+            
+            if response_text:
+                candidate_match = re.search(r'Best matching candidate[:：]\s*(\d+)', response_text, re.IGNORECASE)
+                if candidate_match:
+                    best_index = int(candidate_match.group(1)) - 1
+                else:
+                    numbers = re.findall(r'\b([1-9]\d?)\b', response_text)
+                    if numbers:
+                        best_index = int(numbers[0]) - 1
+            
+            best_index = max(0, min(best_index, len(search_results) - 1))
+            
+            print(f"✅ GPT-4 selected candidate {best_index + 1}")
+            best_result = search_results[best_index]
+            
+            # Extract task ID from the best result
+            task_id = self._extract_task_id_from_cand_id(best_result.get('cand_id', ''))
+            print(f"📋 Extracted task ID: {task_id}")
+            
+            return task_id
+            
+        except Exception as e:
+            print(f"❌ GPT-4 re-ranking failed: {e}")
+            import traceback
+            print(f"Detailed error info: {traceback.format_exc()}")
+            # If GPT-4 re-ranking failed, return the first result task ID
+            if search_results:
+                print("🔄 Using original Top1 result as fallback")
+                return self._extract_task_id_from_cand_id(search_results[0].get('cand_id', ''))
+            else:
+                print("⚠️  No available retrieval results")
+                return None
+    
+    def _extract_task_id_from_cand_id(self, cand_id: str) -> Optional[str]:
+        """
+        Extract task ID from candidate ID
+        Assumes cand_id format like: "task_hash_traj-step_num"
+        
+        Args:
+            cand_id: Candidate ID
+            
+        Returns:
+            Extracted task ID (task hash)
+        """
+        if not cand_id:
+            return None
+        
+        try:
+            # Remove '_traj-' and everything after it to get task hash
+            if '_traj-' in cand_id:
+                task_id = cand_id.split('_traj-')[0]
+                return task_id
+            else:
+                # If format is different, return the whole cand_id as task_id
+                return cand_id
+        except Exception as e:
+            print(f"❌ Error extracting task ID from {cand_id}: {e}")
+            return None
+    
+    def _load_task_description_by_id(self, task_id: str) -> str:
+        """
+        Load task description by task ID from generated_task_descriptions.json
+        
+        Args:
+            task_id: Task ID to search for
+            
+        Returns:
+            Formatted task description string
+        """
+        if not task_id:
+            return ""
+        
+        try:
+            # Load generated task descriptions
+            descriptions_path = "data/Online-Mind2Web/generated_steps/generated_task_descriptions.json"
+            with open(descriptions_path, 'r', encoding='utf-8') as f:
+                generated_descriptions = json.load(f)
+            
+            print(f"\n🔍 Looking for task description with ID: {task_id}")
+            print(f"📚 Available tasks in descriptions file: {len(generated_descriptions)}")
+            
+            # Find matching task description by task_id
+            task_description = None
+            
+            # Search for task_id in the data
+            for desc in generated_descriptions:
+                # Check if task_id field exists and matches
+                if 'task_id' in desc and desc['task_id'] == task_id:
+                    task_description = desc
+                    break
+                # Fallback: check if task_id is part of the task name or other fields
+                elif task_id in str(desc.get('task_name', '')):
+                    task_description = desc
+                    print(f"📝 Found partial match in task_name: {desc['task_name']}")
+                    break
+            
+            if not task_description:
+                print(f"⚠️  WARNING: No matching task description found for task_id: {task_id}")
+                print("Available task examples (first 5):")
+                for i, desc in enumerate(generated_descriptions[:5]):
+                    print(f"  - {desc.get('task_name', 'Unknown')} (ID: {desc.get('task_id', 'No ID')})")
+                if len(generated_descriptions) > 5:
+                    print(f"  ... and {len(generated_descriptions) - 5} more")
+                return ""
+            
+            print(f"✅ Found matching task description: {task_description['task_name']}")
+            
+            # Build formatted reference - similar to OperatorPromptDescriptionRetrievalConstructor
+            reference = f"\n**Example Task:** {task_description['task_name']}\n"
+            reference += f"**Website:** {task_description.get('website', 'N/A')}\n"
+            reference += f"**Task Level:** {task_description.get('level', 'N/A')}\n"
+            reference += f"**Task ID:** {task_id}\n\n"
+            reference += "**Step-by-step Example:**\n"
+            
+            # Add each step's detailed description
+            for step in task_description['steps']:
+                reference += f"\n**Step {step['step_number']}:**\n"
+                reference += f"- **Observation:** {step['observation_description']}\n"
+                reference += f"- **Action:** {step['action_description']}\n"
+                
+                # If there is original action information, include it too
+                if 'original_action' in step:
+                    original_action = step['original_action']
+                    reference += f"- **Operation Type:** {original_action.get('operation', 'N/A')}\n"
+                    if original_action.get('value'):
+                        reference += f"- **Value:** {original_action['value']}\n"
+                    if original_action.get('target'):
+                        target = original_action['target']
+                        if isinstance(target, dict) and 'x' in target:
+                            reference += f"- **Target Coordinates:** ({target['x']:.3f}, {target['y']:.3f})\n"
+                
+                reference += "\n"
+            
+            # Add learning guidance - same as OperatorPromptDescriptionRetrievalConstructor
+            reference += "\n**Learning Points:**\n"
+            reference += "- Follow the **logical sequence of browser actions**, and understand the **intent behind each step**.\n"
+            reference += "- Observe how the agent interprets **visual or textual cues** (e.g., buttons, input fields, layout changes) to decide its actions.\n"
+            reference += "- Pay attention to **how UI elements are located and interacted with** — via coordinates, labels, DOM hierarchy, or visual affordances.\n"
+            reference += "- Learn to generalize: apply similar **action-observation patterns** to new web interfaces.\n"
+            reference += "- Use **coordinate-based clicks** when precise targeting is required, especially in complex or dynamic layouts.\n"
+            reference += "- Consider the **full browser context**, including scroll, focus, or dynamic content changes.\n"
+
+            # reference += "- Pay attention to the sequence of actions and their reasoning\n"
+            # reference += "- Notice how observations lead to specific actions\n"
+            # reference += "- Consider the visual elements and their interactions\n"
+            # reference += "- Adapt the approach to your current task context\n"
+            # reference += "- Use similar coordinate-based interactions when appropriate\n\n"
+            
+            return reference
+            
+        except Exception as e:
+            print(f"❌ Error loading task description by ID {task_id}: {e}")
+            return ""
+    
+    def _save_screenshot_temporarily(self, screenshot_base64: str) -> str:
+        """Save base64 screenshot temporarily and return path"""
+        try:
+            import base64
+            import tempfile
+            
+            # Create temporary file
+            temp_dir = "/tmp/operator_desc_rag_screenshots"
+            os.makedirs(temp_dir, exist_ok=True)
+            
+            timestamp = int(time.time() * 1000)
+            temp_path = os.path.join(temp_dir, f"screenshot_{timestamp}.png")
+            
+            image_data = base64.b64decode(screenshot_base64)
+            with open(temp_path, 'wb') as f:
+                f.write(image_data)
+            
+            return temp_path
+            
+        except Exception as e:
+            print(f"❌ Failed to save screenshot: {e}")
+            return ""
+    
+    def construct(
+            self,
+            user_request: str,
+            rag_path: str,
+            previous_trace: list,
+            observation: str,
+            feedback: str = "",
+            status_description: str = "",
+            screenshot_base64: Optional[str] = None,
+            rag_config: Dict[str, Any] = None,
+            rag_cache_dir: str = None
+    ) -> list:
+        """ 
+        Build Operator prompt with text embedding retrieval + task description loading
+        Uses screenshot + text for embedding calculation (same as OperatorVisionRAGConstructor)
+
+        Args:
+            user_request: User task request
+            rag_path: RAG data path (not used here; rag_config is used)
+            previous_trace: The history of previous operations
+            observation: The current DOM observation (not used in Operator mode)
+            feedback: Feedback or error message
+            status_description: The current task state
+            screenshot_base64: base64 encoding of the current screenshot (REQUIRED for embedding)
+            rag_config: RAG database configuration
+            rag_cache_dir: RAG cache directory path
+
+        Returns:
+            A formatted list of messages
+        """
+        if rag_cache_dir:
+            if not rag_config:
+                rag_config = {}
+            rag_config['rag_cache_dir'] = rag_cache_dir
+            print(f"🗄️  Using RAG cache directory: {rag_cache_dir}")
+        
+        # Initialize RAG database
+        if self.rag_db is None:
+            self._init_rag_database(rag_config)
+        
+        self.prompt_user = Template(self.prompt_user).render(
+            user_request=user_request
+        )
+
+        content_parts = [{"type": "input_text", "text": self.prompt_user}]
+        
+        # Perform screenshot + text based retrieval (same as OperatorVisionRAGConstructor)
+        retrieved_task_id = None
+        if screenshot_base64 and self.rag_db:
+            try:
+                print("🔍 Starting screenshot + text embedding retrieval (same as OperatorVisionRAGConstructor)...")
+                
+                # Save screenshot temporarily (same method as OperatorVisionRAGConstructor)
+                temp_screenshot_path = self._save_screenshot_temporarily(screenshot_base64)
+                
+                if temp_screenshot_path:
+                    self._ensure_embedding_path()
+                    from rag_database import QueryItem
+                    
+                    # Create query with screenshot + text (same as OperatorVisionRAGConstructor)
+                    query = QueryItem(
+                        text=user_request,  # task description + image
+                        image_paths=[temp_screenshot_path]
+                    )
+                    
+                    # Execute RAG retrieval (same method as OperatorVisionRAGConstructor)
+                    print("🔄 Executing screenshot + text embedding retrieval...")
+                    search_results = self.rag_db.search(query, top_k=20, score_threshold=0.0)
+                    
+                    if search_results:
+                        print(f"📊 Retrieved {len(search_results)} candidate results")
+                        
+                        results_for_rerank = []
+                        for result in search_results:
+                            results_for_rerank.append({
+                                'cand_id': result.cand_id,
+                                'score': result.score,
+                                'task_description': result.task_description,
+                                'cand_text': result.cand_text,
+                                'annotation_id': result.annotation_id
+                            })
+                        
+                        # Use GPT-4 to re-rank and extract task ID (same method)
+                        retrieved_task_id = self._gpt4_rerank_and_extract_task_id(
+                            user_request, 
+                            results_for_rerank,
+                            top_k=15
+                        )
+                        
+                        if retrieved_task_id:
+                            print(f"✅ Retrieved task ID: {retrieved_task_id}")
+                        else:
+                            print("⚠️  Failed to extract task ID from retrieval results")
+                    
+                    # Clean up temporary screenshot (same as OperatorVisionRAGConstructor)
+                    try:
+                        os.remove(temp_screenshot_path)
+                    except:
+                        pass
+                        
+            except Exception as e:
+                print(f"❌ RAG retrieval process failed: {e}")
+                import traceback
+                print(f"Error details: {traceback.format_exc()}")
+                retrieved_task_id = None
+        elif not screenshot_base64:
+            print("⚠️  No screenshot provided for description_rag mode, skipping RAG retrieval")
+            print("💡 Description RAG mode requires screenshot for embedding calculation")
+        
+        # Load task description by task ID (unique to OperatorDescRAGConstructor)
+        if retrieved_task_id:
+            self.reference = self._load_task_description_by_id(retrieved_task_id)
+        
+        if self.reference:
+            content_parts.append({
+                "type": "input_text", 
+                "text": "## Here are some similar task reference to help you: ##\n" + self.reference
+            })
+        else:
+            content_parts.append({
+                "type": "input_text", 
+                "text": "## No Similar Task Reference Available ##\nProceeding with general task analysis.\n"
+            })
+        
+        # Add current task context
+        content_parts.append({
+            "type": "input_text", 
+            "text": "\n## Current Task Context ##"
+        })
+        
+        # Add previous actions history
+        if len(previous_trace) > 0:
+            from agent.Memory.short_memory.history import HistoryMemory
+            trace_prompt = HistoryMemory(
+                previous_trace=previous_trace, 
+                reflection=status_description
+            ).construct_previous_trace_prompt()
+            content_parts.append({
+                "type": "input_text", 
+                "text": f"\n**Previous Actions:**\n{trace_prompt}"
+            })
+            
+            if status_description:
+                content_parts.append({
+                    "type": "input_text", 
+                    "text": f"\n**Task Status:** {status_description}"
+                })
+            
+            if feedback:
+                content_parts.append({
+                    "type": "input_text", 
+                    "text": f"\n**Feedback:** {feedback}"
+                })
+        
+        # Add current screenshot if available
+        if screenshot_base64:
+            content_parts.append({
+                "type": "input_text", 
+                "text": "\n**Current Webpage Screenshot:**"
+            })
+            content_parts.append({
+                "type": "input_image",
+                "image_url": f"data:image/png;base64,{screenshot_base64}"
+            })
+        
+        # # Add task instructions - similar to OperatorPromptDescriptionRetrievalConstructor
+        # content_parts.append({
+        #     "type": "input_text", 
+        #     "text": """\n## RAG-ENHANCED EXECUTION GUIDANCE:
+        #     Use the retrieved similar task example to guide your approach and compare the current screenshot with the retrieved task context for pattern matching.
+        #     Please analyze the current state using both visual analysis and retrieved task context, and provide your IMMEDIATE next action.
+        #     """
+        # })
+        
+        # Build final messages
+        messages = [
+            {"role": "system", "content": self.prompt_system},
+            {"role": "user", "content": content_parts}
+        ]
+        
+        # Store retrieved info for logging
+        self.last_retrieved_task_id = retrieved_task_id
+        
+        return messages
+    
+    def get_last_retrieved_task_id(self) -> Optional[str]:
+        """Get the last retrieved task ID, for logging"""
+        return getattr(self, 'last_retrieved_task_id', None)
+    
+    def get_last_retrieved_info(self) -> Optional[Dict]:
+        """Get the last retrieved info, for logging"""
+        task_id = self.get_last_retrieved_task_id()
+        if task_id:
+            return {
+                'task_id': task_id,
+                'retrieved_reference': self.reference[:200] + "..." if len(self.reference) > 200 else self.reference,
+                'rag_mode': 'description_rag',
+                'embedding_retrieval': True,
+                'gpt4_reranked': self.gpt4_client is not None
+            }
+        return None
+    
+    def stringfy_thought_and_action(self, input_list: list) -> str:
+        """Stringify the thought and action data to a formatted string"""
+        try:
+            if isinstance(input_list, str):
+                input_list = json5.loads(input_list, encoding="utf-8")
+            
+            str_output = "["
+            for idx, i in enumerate(input_list):
+                str_output += f'Step{idx + 1}:"Thought: {i.get("thought", "")}, Action: {i.get("action", "")}, Reflection: {i.get("reflection", "")}";\n'
+            str_output += "]"
+            return str_output
+            
+        except Exception as e:
+            print(f"Error stringifying thought and action: {e}")
+            return str(input_list)
+
+# Vision RAG Constructor for DOM Mode
+class DOMVisionRAGConstructor(BasePromptConstructor):
+    """
+    Vision RAG Constructor for DOM
+    Uses only visual embeddings from current screenshot to retrieve related task information, then uses GPT-4 to re-rank and select the best match.
+    This version is adapted for DOM mode, using BasePrompts and standard message format.
+    Note: This version does NOT use task text descriptions - only image-based retrieval.
+    """
+    
+    def __init__(self):
+        super().__init__()
+        # Use DOM mode prompts
+        self.prompt_system = BasePrompts.planning_rag_prompt_system
+        self.prompt_user = BasePrompts.planning_prompt_user
+        self.rag_db = None
+        self.gpt4_client = None
+        self.config = self._load_config()
+        self._init_gpt4_client()
+        self._cache_saved = False  # Track if cache has been saved
+    
+    def _load_config(self) -> Dict[str, Any]:
+        """Load configuration from TOML file"""
+        try:
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "configs", "embedding.toml")
+            
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    toml_config = toml.load(f)
+                
+                # Flatten the TOML structure for easy access
+                flattened_config = {}
+                for section_name, section_data in toml_config.items():
+                    flattened_config.update(section_data)
+                
+                return flattened_config
+            else:
+                print(f"⚠️  Config file not found at {config_path}")
+                return {}
+        except Exception as e:
+            print(f"❌ Error loading config: {e}")
+            return {}
+    
+    def _ensure_embedding_path(self):
+        import sys
+        import os
+        
+        embedding_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../Embedding/VLM2Vec-pro')
+        if embedding_path not in sys.path:
+            sys.path.append(embedding_path)
+            print(f"sys.path: {embedding_path}")
+    
+    def _init_gpt4_client(self):
+        """GPT-4 client for re-ranking"""
+        try:
+            import os
+            from openai import OpenAI
+            
+            api_key = os.getenv('OPENAI_API_KEY')
+            if api_key:
+                self.gpt4_client = OpenAI(api_key=api_key)
+                print("🤖 GPT-4 client initialized successfully")
+            else:
+                print("⚠️  OpenAI API key not found, using original retrieval results")
+        except Exception as e:
+            print(f"❌ GPT-4 client initialization failed: {e}")
+    
+    def _init_rag_database(self, rag_config: Dict[str, Any] = None):
+        """init RAG database - support loading from cache"""
+        if self.rag_db is not None:
+            return
+        
+        # check if there is RAG cache directory configuration
+        rag_cache_dir = None
+        if rag_config and 'rag_cache_dir' in rag_config:
+            rag_cache_dir = rag_config['rag_cache_dir']
+        elif hasattr(self, 'rag_cache_dir') and self.rag_cache_dir:
+            rag_cache_dir = self.rag_cache_dir
+        
+        # if there is RAG cache directory, try to load from cache
+        if rag_cache_dir and os.path.exists(rag_cache_dir):
+            rag_index_path = os.path.join(rag_cache_dir, "rag_index.index")
+            rag_config_path = os.path.join(rag_cache_dir, "rag_config.json")
+            
+            if os.path.exists(rag_index_path) and os.path.exists(rag_config_path):
+                try:
+                    print(f"🔄 Loading RAG database from cache: {rag_cache_dir}")
+                    
+                    with open(rag_config_path, 'r', encoding='utf-8') as f:
+                        cached_config = json.load(f)
+                    
+                    self._ensure_embedding_path()
+                    from rag_database import create_rag_database_from_config
+                    
+                    self.rag_db = create_rag_database_from_config(**cached_config)
+                    self.rag_db.load_index(rag_index_path)
+                    return
+                    
+                except Exception as e:
+                    print(f"Cache loading failed: {e}")
+        
+        # if there is no cache or loading failed, execute the original build logic
+        try:
+            self._ensure_embedding_path()
+            from rag_database import create_rag_database_from_config
+            
+            # Load configuration from TOML file
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "configs", "embedding.toml")
+            
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    toml_config = toml.load(f)
+                
+                # Flatten the TOML structure
+                default_config = {}
+                for section_name, section_data in toml_config.items():
+                    default_config.update(section_data)
+            else:
+                print(f"⚠️  Config file not found at {config_path}, using fallback defaults")
+                # Fallback to original hardcoded config
+                default_config = {
+                    "model_name": "/home/ubuntu/data/csb/Embedding/Qwen2-VL-TokenSelection-2B",
+                    "checkpoint_path": "/home/ubuntu/data/csb/Embedding/experiments/train/qwen2_vl-lite_full-lora8-bsz128x8x2-interleave_0.2-lr5e5-max_step_256-warmup_12-uigraph_select_0.5-lm_skip_all-vis_skip_all/huggingface",
+                    "model_backbone": "qwen2_vl_tokenselection",
+                    "cand_json_path": "/home/ubuntu/data/csb/Embedding/data/processed_cand_with_task.json",
+                    "embedding_parquet_path": "/home/ubuntu/data/csb/Embedding/data/trajectory_embedding.parquet",
+                    "lora": True,
+                    "pooling": "eos", 
+                    "normalize": True,
+                    "resize_use_processor": True,
+                    "max_len": 65536,
+                    "per_device_eval_batch_size": 2,
+                    "dataloader_num_workers": 2,
+                    "device": "cuda"
+                }
+            
+            # Override with any provided rag_config
+            if rag_config:
+                default_config.update(rag_config)
+                print(f"🔄 Config overridden with: {list(rag_config.keys())}")
+            
+            print("🔄 initializing RAG database...")
+            self.rag_db = create_rag_database_from_config(**default_config)
+            print("✅ RAG database initialized")
+            
+            # Save to cache if cache directory is provided and not already saved
+            if rag_cache_dir and not self._cache_saved:
+                try:
+                    os.makedirs(rag_cache_dir, exist_ok=True)
+                    
+                    rag_index_path = os.path.join(rag_cache_dir, "rag_index.index")
+                    rag_config_path = os.path.join(rag_cache_dir, "rag_config.json")
+                    
+                    print(f"💾 Saving DOMVisionRAG cache to: {rag_cache_dir}")
+                    self.rag_db.save_index(rag_index_path)
+                    
+                    with open(rag_config_path, 'w', encoding='utf-8') as f:
+                        json.dump(default_config, f, ensure_ascii=False, indent=2)
+                    
+                    print(f"✅ DOMVisionRAG cache saved successfully")
+                    print(f"📁 Index file: {rag_index_path}")
+                    print(f"🔧 Config file: {rag_config_path}")
+                    
+                    self._cache_saved = True  # Mark cache as saved
+                    
+                except Exception as save_e:
+                    print(f"⚠️  Failed to save DOMVisionRAG cache: {save_e}")
+                    # Continue execution even if cache save fails
+            
+        except Exception as e:
+            print(f"❌ RAG database initialization failed: {e}")
+            self.rag_db = None
+    
+    def set_rag_cache_dir(self, rag_cache_dir: str):
+        """set RAG cache directory"""
+        self.rag_cache_dir = rag_cache_dir
+        print(f"🗄️  RAG cache directory set to: {rag_cache_dir}")
+
+    def _encode_image_to_base64(self, image_path_or_base64: str) -> str:
+        """encode image to base64 format with compression for token efficiency"""
+        try:
+            # if already base64, return directly
+            if image_path_or_base64.startswith('data:image'):
+                return image_path_or_base64.split(',')[1]
+            elif len(image_path_or_base64) > 100 and '/' not in image_path_or_base64:
+                return image_path_or_base64
+            
+            import base64
+            import os
+            from PIL import Image
+            import io
+            
+            if not os.path.exists(image_path_or_base64):
+                print(f"⚠️  image file not found: {image_path_or_base64}")
+                return ""
+            
+            # Get image processing parameters from config
+            max_size = self.config.get('max_size', 800)
+            quality = self.config.get('quality', 85)
+            
+            # read and compress image for token efficiency
+            with Image.open(image_path_or_base64) as img:
+                if img.width > max_size or img.height > max_size:
+                    img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                
+                # convert to base64 with configurable quality
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format="JPEG", quality=quality, optimize=True)
+                img_bytes = img_byte_arr.getvalue()
+                
+                encoded = base64.b64encode(img_bytes).decode('utf-8')
+                return encoded
+                
+        except Exception as e:
+            print(f"❌ image encoding failed: {e}")
+            return ""
+    
+    def _gpt4_rerank_results(self, query_image_base64: str, query_task: str, search_results: List[Dict], top_k: int = 15) -> Optional[Dict]:
+        """
+        re-rank and select the best match using GPT-4
+        
+        Args:
+            query_image_base64: query image base64
+            query_task: query task description
+            search_results: search results list
+            top_k: top K results to consider
+            
+        Returns:
+            the best matching result, if failed, return None
+        """
+        if not self.gpt4_client or not search_results:
+            print("🔄 GPT-4 not available, using original Top1 result")
+            return search_results[0] if search_results else None
+        
+        try:
+            candidates_text = []
+            candidate_images = []
+            
+            for i, result in enumerate(search_results[:top_k]):
+                task_desc = result.get('task_description', '无任务描述')
+                cand_id = result.get('cand_id', f'candidate_{i}')
+                
+                candidate_image_path = ""
+                if '_traj-' in cand_id:
+                    parts = cand_id.split('_traj-')
+                    task_hash = parts[0]
+                    step_num = parts[1]
+                    # Get candidate image base path from config
+                    candidate_image_base_path = self.config.get('candidate_image_base_path', '/home/ubuntu/data/csb/images/embedding/GAE-Bench/images/Online-Mind2Web')
+                    candidate_image_path = f"{candidate_image_base_path}/{task_hash}_step_{step_num}.png"
+                
+                candidate_info = f"""
+Candidate {i+1}:
+- Candidate ID: {cand_id}
+- Task Description: {task_desc}
+"""
+                candidates_text.append(candidate_info)
+                candidate_images.append(candidate_image_path)
+            
+            # GPT-4 prompt for re-ranking
+            prompt = f"""
+You are a web interface image matching expert. I will provide you with one query web interface image, a query task description, and {len(candidates_text)} candidate web interfaces, each with corresponding web interface images and task descriptions.
+
+Query Task Description: {query_task}
+
+Please carefully analyze the query image and candidate images, and match them based on task descriptions, including:
+- Interface elements (buttons, input fields, text, etc.)
+- Interface layout and design
+- Interface visual similarity
+- Matching degree between query task and candidate task descriptions
+
+Candidate Information:
+{"".join(candidates_text)}
+
+Please select the most matching candidate from the above options, considering the following main factors:
+1. Image visual similarity
+2. Interface element matching degree
+3. Relevance between query task and candidate task descriptions
+
+Please answer:
+The most matching candidate number (1-{len(candidates_text)})
+
+Answer format:
+Best matching candidate: [number]
+"""
+            
+            message_content = [
+                {"type": "text", "text": prompt},
+                {"type": "text", "text": "\nQuery Image:"},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{query_image_base64}",
+                        "detail": "low"
+                    }
+                }
+            ]
+            
+            # add candidate images (max=15)
+            cand_img_num = min(15, len(candidate_images))
+            for i, candidate_image_path in enumerate(candidate_images[:cand_img_num]):
+                if candidate_image_path and os.path.exists(candidate_image_path):
+                    candidate_image_base64 = self._encode_image_to_base64(candidate_image_path)
+                    if candidate_image_base64:
+                        message_content.extend([
+                            {"type": "text", "text": f"\nCandidate {i+1} Image:"},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{candidate_image_base64}",
+                                    "detail": "low"
+                                }
+                            }
+                        ])
+            
+            # Get GPT-4 parameters from config
+            gpt4_model = self.config.get('model', 'gpt-4o')
+            gpt4_max_tokens = self.config.get('max_tokens', 1500)
+            gpt4_temperature = self.config.get('temperature', 0.0)
+            
+            # call GPT-4
+            response = self.gpt4_client.chat.completions.create(
+                model=gpt4_model,
+                messages=[{"role": "user", "content": message_content}],
+                max_tokens=gpt4_max_tokens,
+                temperature=gpt4_temperature
+            )
+            
+            response_text = response.choices[0].message.content
+            print(f"🤖 GPT-4 re-ranking response: {response_text}")
+            
+            # parse response
+            import re
+            best_index = 0
+            
+            if response_text:
+                candidate_match = re.search(r'Best matching candidate[:：]\s*(\d+)', response_text, re.IGNORECASE)
+                if candidate_match:
+                    best_index = int(candidate_match.group(1)) - 1
+                else:
+                    numbers = re.findall(r'\b([1-9]\d?)\b', response_text)
+                    if numbers:
+                        best_index = int(numbers[0]) - 1
+            
+            best_index = max(0, min(best_index, len(search_results) - 1))
+            
+            print(f"✅ GPT-4 selected candidate {best_index + 1}")
+            return search_results[best_index]
+            
+        except Exception as e:
+            print(f"❌ GPT-4 re-ranking failed: {e}")
+            import traceback
+            print(f"detailed error info: {traceback.format_exc()}")
+            # if GPT-4 re-ranking failed, return the first result of original retrieval
+            if search_results:
+                print("🔄 using original Top1 result as fallback")
+                return search_results[0]
+            else:
+                print("⚠️ no available retrieval results")
+                return None
+    
+    def _save_screenshot_temporarily(self, screenshot_base64: str) -> str:
+        """save base64 screenshot temporarily and return path"""
+        try:
+            import base64
+            import tempfile
+            
+            # create temporary file
+            temp_dir = "/tmp/dom_rag_screenshots"
+            os.makedirs(temp_dir, exist_ok=True)
+            
+            timestamp = int(time.time() * 1000)
+            temp_path = os.path.join(temp_dir, f"screenshot_{timestamp}.png")
+            
+            image_data = base64.b64decode(screenshot_base64)
+            with open(temp_path, 'wb') as f:
+                f.write(image_data)
+            
+            return temp_path
+            
+        except Exception as e:
+            print(f"❌ failed to save: {e}")
+            return ""
+    
+    def construct(
+            self,
+            user_request: str,
+            rag_path: str,
+            previous_trace: list,
+            observation: str,
+            feedback: str = "",
+            status_description: str = "",
+            screenshot_base64: Optional[str] = None,
+            rag_config: Optional[Dict[str, Any]] = None,
+            rag_cache_dir: Optional[str] = None
+    ) -> list:
+        """ 
+        Build DOM prompt with pure image retrieval RAG support
+        Enhanced with multi-step visual-action sequence support
+
+        Args:
+            user_request: User task request
+            rag_path: RAG data path (not used here; rag_config is used)
+            previous_trace: The history of previous operations
+            observation: The current DOM observation
+            feedback: Feedback or error message
+            status_description: The current task state
+            screenshot_base64: The base64 encoding of the current screenshot (for image-only retrieval)
+            rag_config: RAG database configuration
+            rag_cache_dir: RAG cache directory path
+
+        Returns:
+            A formatted list of messages compatible with DOM mode
+        """
+        print(f"🔍 DOMVisionRAGConstructor.construct() called")
+        print(f"   - user_request: {user_request[:100]}..." if len(user_request) > 100 else f"   - user_request: {user_request}")
+        print(f"   - screenshot_base64 provided: {'✅ YES' if screenshot_base64 else '❌ NO'}")
+        print(f"   - screenshot_base64 length: {len(screenshot_base64) if screenshot_base64 else 0}")
+        print(f"   - rag_cache_dir: {rag_cache_dir}")
+        print(f"   - rag_config keys: {list(rag_config.keys()) if rag_config else 'None'}")
+        print(f"   - self.rag_db initialized: {'✅ YES' if self.rag_db else '❌ NO'}")
+        
+        if rag_cache_dir:
+            if not rag_config:
+                rag_config = {}
+            rag_config['rag_cache_dir'] = rag_cache_dir
+            print(f"🗄️  Using RAG cache directory: {rag_cache_dir}")
+        
+        # init RAG database
+        if self.rag_db is None:
+            print("🔄 Initializing RAG database...")
+            self._init_rag_database(rag_config or {})
+            print(f"   - RAG database after init: {'✅ Initialized' if self.rag_db else '❌ Failed'}")
+        else:
+            print("✅ RAG database already initialized")
+        
+        # Start with base prompt
+        self.prompt_user = Template(self.prompt_user).render(
+            user_request=user_request)
+        
+        # Add retrieved examples with their steps and images
+        retrieved_info = None
+        print(f"🔍 RAG retrieval condition check:")
+        print(f"   - screenshot_base64: {'✅ Available' if screenshot_base64 else '❌ Missing'}")
+        print(f"   - self.rag_db: {'✅ Available' if self.rag_db else '❌ Missing'}")
+        print(f"   - Will execute RAG retrieval: {'✅ YES' if (screenshot_base64 and self.rag_db) else '❌ NO'}")
+        
+        if screenshot_base64 and self.rag_db:
+            try:
+                print("🔍 Start DOM Vision RAG retrieval based on screenshots...")
+                
+                temp_screenshot_path = self._save_screenshot_temporarily(screenshot_base64)
+                
+                if temp_screenshot_path:
+
+                    self._ensure_embedding_path()
+                    from rag_database import QueryItem
+                    
+                    query = QueryItem(
+                        text=user_request, # task description + image
+                        image_paths=[temp_screenshot_path]
+                    )
+                    
+                    # execute RAG retrieval
+                    print("🔄 execute pure image retrieval...")
+                    search_results = self.rag_db.search(query, top_k=20, score_threshold=0.0)
+                    
+                    if search_results:
+                        print(f"📊 retrieved {len(search_results)} candidate results")
+                        
+                        results_for_rerank = []
+                        for result in search_results:
+                            cand_image_path = '[]'
+                            if hasattr(result, 'cand_image_path'):
+                                cand_image_path = result.cand_image_path
+                            elif hasattr(result, 'image_paths'):
+                                cand_image_path = result.image_paths
+                            else:
+                                try:
+                                    import json
+                                    data_file = "data/processed_cand_with_task.json"
+                                    if os.path.exists(data_file):
+                                        with open(data_file, 'r', encoding='utf-8') as f:
+                                            cand_data = json.load(f)
+                                        if result.cand_id in cand_data:
+                                            cand_image_path = cand_data[result.cand_id].get('cand_image_path', '[]')
+                                except Exception as e:
+                                    print(f"⚠️  Failed to load cand_image_path from file: {e}")
+                            
+                            results_for_rerank.append({
+                                'cand_id': result.cand_id,
+                                'score': result.score,
+                                'task_description': result.task_description,
+                                'cand_text': result.cand_text,
+                                'annotation_id': result.annotation_id,
+                                'cand_image_path': cand_image_path
+                            })
+                        
+                        # re-rank
+                        best_result = self._gpt4_rerank_results(
+                            screenshot_base64, 
+                            user_request, 
+                            results_for_rerank,
+                            top_k=15
+                        )
+                        
+                        if best_result:
+                            retrieved_info = best_result
+                            print(f"✅ retrieved the best matching result: {best_result['cand_id']}")
+                        
+                    # clean
+                    try:
+                        os.remove(temp_screenshot_path)
+                    except:
+                        pass
+                        
+            except Exception as e:
+                print(f"❌ RAG retrieval process failed: {e}")
+                import traceback
+                print(f"error: {traceback.format_exc()}")
+                retrieved_info = None
+        
+        # Build multimodal content parts (exactly like PlanningPromptVisionRetrievalConstructor)
+        prompt_elements = [{"type": "text", "text": self.prompt_user}]
+        
+        if retrieved_info:
+            print(f"🔍 Debug - Retrieved info keys: {list(retrieved_info.keys())}")
+            print(f"✅ RAG retrieval successful - adding multimodal reference to prompt")
+            self._add_multimodal_reference(prompt_elements, retrieved_info)
+        else:
+            print(f"❌ No RAG retrieval results - proceeding without reference")
+            prompt_elements.append({
+                "type": "text", 
+                "text": "\n## No Similar Task Reference Available ##\nProceeding with general task analysis.\n"
+            })
+        
+        # Add previous trace if available
+        if len(previous_trace) > 0:
+            trace_prompt = HistoryMemory(
+                previous_trace=previous_trace, 
+                reflection=status_description
+            ).construct_previous_trace_prompt()
+            prompt_elements.append({"type": "text", "text": trace_prompt})
+            
+            if status_description:
+                prompt_elements.append({
+                    "type": "text", 
+                    "text": f"\nTask completion description: {status_description}"
+                })
+                
+            if feedback:
+                prompt_elements.append({
+                    "type": "text", 
+                    "text": f"\nHere are some other things you need to know:\n{feedback}"
+                })
+        
+        # Add current DOM observation (full content as requested)
+        if observation:
+            prompt_elements.append({
+                "type": "text", 
+                "text": f"\nHere is the accessibility tree that you should refer to for this task:\n{observation}"
+            })
+        
+        # Add enhanced task instructions for DOM mode
+#         prompt_elements.append({
+#             "type": "text",
+#             "text": """\n## ENHANCED DOM EXECUTION INSTRUCTIONS:
+# 1. **Multi-Step Reference Analysis**: Study the complete visual-action sequence from the reference task
+# 2. **Step-by-Step Comparison**: Compare each reference step's observation with your current DOM state
+# 3. **Pattern Application**: Identify which reference step most closely matches your current DOM situation
+# 4. **Action Adaptation**: Adapt the successful action from the matching reference step to your DOM context
+# 5. **Element Mapping**: Map DOM elements between reference and current accessibility tree
+# 6. **Element ID Precision**: Use precise element_id values from the current DOM tree for actions
+# 7. **Sequential Reasoning**: Understand the logical flow from one DOM action to the next
+# 8. **Task Completion**: If the task appears complete, use "get_final_answer" action to finish
+# 9. **Completion Verification**: Before using get_final_answer, ensure all task requirements are met
+# 10. **DOM-focused Execution**: Execute DOM actions directly based on current accessibility tree
+
+# ## CRITICAL REMINDER FOR DOM VISUAL SEQUENCE LEARNING:
+# You have access to a complete visual-action sequence from a similar task. Use this step-by-step reference to:
+# - **Identify your current DOM position** in the task progression
+# - **Find the matching reference step** that corresponds to your current DOM state  
+# - **Apply the reference action pattern** to your current DOM situation using proper element_id
+# - **Progress toward the next logical DOM step** in the sequence
+
+# Analyze the visual sequence, identify your current DOM step, and provide your next action with the correct element_id from the accessibility tree!
+# """
+#         })
+        
+        # Add current screenshot (like OperatorVisionRAGConstructor but with PlanningPromptVisionRetrievalConstructor format)
+        if screenshot_base64:
+            prompt_elements.append({
+                "type": "text", 
+                "text": "\nCurrent webpage screenshot:"
+            })
+            prompt_elements.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{screenshot_base64}"}
+            })
+        
+        # Construct final messages using multimodal format (like PlanningPromptVisionRetrievalConstructor)
+        messages = [
+            {"role": "system", "content": self.prompt_system},
+            {"role": "user", "content": prompt_elements}
+        ]
+        
+        # store retrieved info for logging
+        self.last_retrieved_info = retrieved_info
+        
+        return messages
+
+    def get_last_retrieved_info(self) -> Optional[Dict]:
+        """get the last retrieved info, for logging"""
+        return getattr(self, 'last_retrieved_info', None)
+    
+    def stringfy_thought_and_action(self, input_list: list) -> str:
+        """stringify the thought and action data to a formatted string"""
+        try:
+            if isinstance(input_list, str):
+                input_list = json5.loads(input_list, encoding="utf-8")
+            
+            str_output = "["
+            for idx, i in enumerate(input_list):
+                str_output += f'Step{idx + 1}:"Thought: {i.get("thought", "")}, Action: {i.get("action", "")}, Reflection: {i.get("reflection", "")}";\n'
+            str_output += "]"
+            return str_output
+            
+        except Exception as e:
+            print(f"Error stringifying thought and action: {e}")
+            return str(input_list)
+
+    def _add_multimodal_reference(self, prompt_elements: List[Dict], retrieved_info: Dict) -> None:
+        """
+        Add multimodal reference content to prompt_elements (exactly like PlanningPromptVisionRetrievalConstructor)
+        
+        Args:
+            prompt_elements: Prompt elements list to append to
+            retrieved_info: Retrieved information dictionary
+        """
+        try:
+            cand_text = retrieved_info.get('cand_text', '')
+            cand_image_paths = retrieved_info.get('cand_image_path', '[]')
+            task_description = retrieved_info.get('task_description', 'N/A')
+            
+            # Parse steps and corresponding screenshots
+            steps = self._parse_cand_text_and_images(cand_text, cand_image_paths)
+            
+            if not steps:
+                print("⚠️  No valid steps parsed from reference data")
+                return
+            
+            # Add concise task reference
+            prompt_elements.append({
+                "type": "text", 
+                "text": f"\n## Similar Task Reference ## \nBelow are task examples relevant to your current step—two example steps are provided for reference.\n**Task Description:** {task_description}\n**Step-by-step Visual-Action Sequence:**\n"
+            })
+            
+            # Add only the first 2 steps to limit token usage  
+            max_steps = min(2, len(steps))
+            for i, step in enumerate(steps[:max_steps]):
+                # Add step description
+                prompt_elements.append({
+                    "type": "text",
+                    "text": f"Step {step['step_number'] + 1}: {step['action']}\n"
+                })
+                
+                # Add corresponding screenshot using exact PlanningPromptVisionRetrievalConstructor format
+                if step['image_path']:
+                    image_path = step['image_path']
+                    full_image_path = f"data/Online-Mind2Web/rag_data/image/{image_path}"
+                    
+                    try:
+                        if os.path.exists(full_image_path):
+                            with open(full_image_path, 'rb') as img_file:
+                                img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
+                                # Exact format from PlanningPromptVisionRetrievalConstructor
+                                prompt_elements.append({
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/png;base64,{img_base64}"}
+                                })
+                                print(f"📸 Added reference screenshot for step {step['step_number'] + 1}")
+                    except Exception as e:
+                        print(f"⚠️ Error loading image {image_path}: {e}")
+            
+        except Exception as e:
+            print(f"❌ Error adding multimodal reference: {e}")
+
+    def _parse_cand_text_and_images(self, cand_text: str, cand_image_path_json: str) -> List[Dict[str, Any]]:
+        """
+        Parse cand_text and cand_image_path, establish step-screenshot correspondence
+        
+        Args:
+            cand_text: Candidate text containing multiple Observation-Action pairs
+            cand_image_path_json: JSON string of image paths
+            
+        Returns:
+            List containing step information, each step includes observation, action and corresponding image path
+        """
+        try:
+            import json5
+            import json
+            
+            image_paths = []
+            if isinstance(cand_image_path_json, str):
+                try:
+                    image_paths = json5.loads(cand_image_path_json)
+                except:
+                    try:
+                        image_paths = json.loads(cand_image_path_json)
+                    except json.JSONDecodeError:
+                        try:
+                            fixed_json = cand_image_path_json.replace("'", '"')
+                            image_paths = json.loads(fixed_json)
+                        except json.JSONDecodeError:
+                            try:
+                                image_paths = eval(cand_image_path_json)
+                            except:
+                                print(f"❌ Error parsing cand_image_path: {cand_image_path_json}")
+                                return []
+            elif isinstance(cand_image_path_json, list):
+                image_paths = cand_image_path_json
+            
+            steps = []
+            lines = cand_text.split('\n')
+            current_observation = None
+            current_action = None
+            step_counter = 0
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                if line.startswith('Observation'):
+                    if current_observation and current_action:
+                        steps.append({
+                            'step_number': step_counter,
+                            'observation': current_observation,
+                            'action': current_action,
+                            'image_path': image_paths[step_counter] if step_counter < len(image_paths) else None
+                        })
+                        step_counter += 1
+                    
+                    current_observation = line
+                    current_action = None
+                    
+                elif line.startswith('Action'):
+                    current_action = line
+                    
+                    if current_observation:
+                        steps.append({
+                            'step_number': step_counter,
+                            'observation': current_observation,
+                            'action': current_action,
+                            'image_path': image_paths[step_counter] if step_counter < len(image_paths) else None
+                        })
+                        step_counter += 1
+                        current_observation = None
+                        current_action = None
+            
+            return steps
+            
+        except Exception as e:
+            print(f"❌ Error parsing cand_text and images: {e}")
+            return []
+
+    def _format_multi_step_reference(self, retrieved_info: Dict) -> str:
+        """
+        Format multi-step reference information for DOM mode
+        
+        Args:
+            retrieved_info: Retrieved information dictionary
+            
+        Returns:
+            Formatted reference string for DOM mode
+        """
+        try:
+            cand_text = retrieved_info.get('cand_text', '')
+            cand_image_paths = retrieved_info.get('cand_image_path', '[]')
+            task_description = retrieved_info.get('task_description', 'N/A')
+            
+            # Parse steps and corresponding screenshots
+            steps = self._parse_cand_text_and_images(cand_text, cand_image_paths)
+            
+            if not steps:
+                print("⚠️  No valid steps parsed from reference data")
+                return f"\n**Task Description:** {task_description}\n**Note:** No valid reference steps available.\n"
+            
+            reference_content = f"\n**Task Description:** {task_description}\n**Step-by-step Visual-Action Sequence:**\n"
+            
+            for step in steps:
+                reference_content += f"\n**Step {step['step_number'] + 1}:**\n"
+                reference_content += f"- **Observation:** {step['observation']}\n"
+                reference_content += f"- **Action:** {step['action']}\n"
+                
+                if step['image_path']:
+                    image_path = step['image_path']
+                    
+                    # Try multiple possible paths
+                    possible_paths = [
+                        image_path,
+                        f"data/Online-Mind2Web/rag_data/image/{image_path}",
+                        f"data/Online-Mind2Web/{image_path}",
+                        f"data/{image_path}"
+                    ]
+                    
+                    if image_path.startswith('Online-Mind2Web/'):
+                        clean_path = image_path.replace('Online-Mind2Web/', '', 1)
+                        possible_paths.extend([
+                            f"data/Online-Mind2Web/rag_data/image/{clean_path}",
+                            f"data/Online-Mind2Web/{clean_path}",
+                            f"data/{clean_path}"
+                        ])
+                    
+                    found_image = False
+                    for full_image_path in possible_paths:
+                        try:
+                            if os.path.exists(full_image_path):
+                                reference_content += f"- **Screenshot Reference:** Available at {image_path}\n"
+                                print(f"📸 Reference screenshot found for step {step['step_number'] + 1}: {full_image_path}")
+                                found_image = True
+                                break
+                        except Exception as e:
+                            continue
+                    
+                    if not found_image:
+                        reference_content += f"- **Screenshot Reference:** Not found ({image_path})\n"
+                        print(f"❌ Image not found for step {step['step_number'] + 1}")
+                else:
+                    reference_content += f"- **Screenshot Reference:** Not available\n"
+                
+                reference_content += "\n"
+            
+            # Add learning points specifically for DOM mode
+            reference_content += """\n**Learning Points for DOM Actions:**
+- **DOM Pattern Recognition:** Compare each reference observation with your current accessibility tree
+- **Action Sequence Logic:** Understand the reasoning behind each DOM action step
+- **Element Targeting:** Learn how to identify and interact with similar DOM elements using element_id
+- **Progressive Task Completion:** Follow the step-by-step approach to reach the goal using DOM actions
+- **Element ID Mapping:** Map elements between reference steps and current DOM tree
+
+"""
+            return reference_content
+            
+        except Exception as e:
+            print(f"❌ Error formatting multi-step reference: {e}")
+            import traceback
+            print(f"Error details: {traceback.format_exc()}")
+            return f"\n**Task Description:** {retrieved_info.get('task_description', 'N/A')}\n**Error:** Could not format reference steps.\n"

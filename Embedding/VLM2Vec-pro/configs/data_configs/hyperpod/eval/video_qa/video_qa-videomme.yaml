@@ -1,0 +1,6 @@
+Video-MME:
+    dataset_parser: videomme
+    video_dir: /fsx/home/ruimeng/data/lmms-lab/Video-MME/videos
+    frame_dir: /fsx/home/ruimeng/data/MMEB_Pro/frames/video_qa/Video-MME/
+    max_frames_saved: 64
+    num_frames: 8

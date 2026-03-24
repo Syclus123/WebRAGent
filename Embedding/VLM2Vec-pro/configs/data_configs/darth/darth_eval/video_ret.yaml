@@ -1,0 +1,54 @@
+MSR-VTT:
+    dataset_parser: "msrvtt"
+    dataset_name: "MSR-VTT"
+    video_root: "/data/ziyan/video_retrieval/MSR-VTT/videos"
+    frame_root: "/data/ziyan/video_retrieval/MSR-VTT/frames"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    eval_type: "global"
+    metrics: ["precision", "recall", "ndcg"]
+
+MSVD:
+    dataset_parser: "msvd"
+    dataset_name: "MSVD"
+    video_root: "/data/ziyan/video_retrieval/MSVD/videos"
+    frame_root: "/data/ziyan/video_retrieval/MSVD/frames"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    eval_type: "global"
+    metrics: ["precision", "recall", "ndcg"]
+
+DiDeMo:
+    dataset_parser: "didemo"
+    dataset_name: "DiDeMo"
+    video_root: "/data/ziyan/video_retrieval/DiDeMo/videos"
+    frame_root: "/data/ziyan/video_retrieval/DiDeMo/frames"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    eval_type: "global"
+    metrics: ["precision", "recall", "ndcg"]
+
+YouCook2:
+    dataset_parser: "youcook2"
+    dataset_name: "YouCook2"
+    video_root: "/data/ziyan/video_retrieval/YouCook2/videos"
+    frame_root: "/data/ziyan/video_retrieval/YouCook2/frames"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    eval_type: "global"
+    metrics: ["precision", "recall", "ndcg"]
+
+VATEX:
+    dataset_parser: "vatex"
+    dataset_name: "VATEX"
+    video_root: "/data/ziyan/video_retrieval/VATEX/videos"
+    frame_root: "/data/ziyan/video_retrieval/VATEX/frames"
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 8
+    eval_type: "global"
+    metrics: ["precision", "recall", "ndcg"]

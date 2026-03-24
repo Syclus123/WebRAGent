@@ -1,0 +1,46 @@
+video_caption_300k:
+    dataset_parser: llavahound
+    dataset_name: video_caption_300k
+    dataset_path: /fsx/home/ruimeng/data/train_video_and_instruction/video_instruction/train/sft/video_caption_300k.jsonl
+    video_frame_basedir: /fsx/home/ruimeng/data/train_video_and_instruction/train_300k
+    weight: 4
+    num_rows: 300_000
+    num_frames: 4
+video_240k_caption_15k:
+    dataset_parser: llavahound
+    dataset_name: video_240k_caption_15k
+    dataset_path: /fsx/home/ruimeng/data/train_video_and_instruction/video_instruction/train/sft/video_240k_caption_15k.jsonl
+    video_frame_basedir: /fsx/home/ruimeng/data/train_video_and_instruction/train_300k
+    weight: 4
+    num_rows: 255_000
+    num_frames: 4
+colpali_train_set:
+    dataset_parser: vidore
+    dataset_name: vidore/colpali_train_set
+    weight: 1
+visrag-indomain:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-In-domain-data
+    global_dataset_name: VisRAG-Indomain-data
+    weight: 1
+visrag-synthetic:
+    dataset_parser: visrag
+    dataset_name: openbmb/VisRAG-Ret-Train-Synthetic-data
+    global_dataset_name: VisRAG-Synthetic-data
+    weight: 1
+
+A-OKVQA:
+    dataset_parser: mmeb
+    dataset_name: TIGER-Lab/MMEB-train
+    subset_name: A-OKVQA
+    dataset_split: original
+    image_dir: /fsx/sfr/data/MMEB/MMEB-train
+    size: 34100
+    weight: 1
+
+scifact-wizardlm2:
+    dataset_parser: beir
+    dataset_name: SciFact
+    file_path: /fsx/sfr/data/xgen-embedding/data/hn_mine/nv-embed-v2/beir_scifact-all_wizardlm2.jsonl
+    size: 4900
+    weight: 1

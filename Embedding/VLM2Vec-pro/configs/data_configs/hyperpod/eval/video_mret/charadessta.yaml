@@ -1,0 +1,17 @@
+Charades-sta:
+    dataset_parser: moment_retrieval
+    dataset_name: Charades-sta
+    dataset_split: train
+    data_path: /fsx/home/ruimeng/data/MMEB_Pro/data/charades_sta.jsonl
+    video_dir:
+    clip_dir:
+    frame_dir: /fsx/home/ruimeng/data/MMEB_Pro/frames/video_mret/charades_sta/
+    num_negative_clips: 9
+    max_video_frames_saved: 64
+    max_clip_frames_saved: 8
+    num_video_frames: 8
+    num_clip_frames: 8
+    metrics:
+        - precision
+        - recall
+        - ndcg

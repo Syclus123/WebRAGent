@@ -1,0 +1,5 @@
+pixmo:
+    dataset_parser: pixmo
+    dataset_name: Tevatron/pixmo-docs
+    image_dir: /mnt/disks/embedding/data/vlm2vec/MMEB-train/visdoc/pixmo
+    weight: 1
